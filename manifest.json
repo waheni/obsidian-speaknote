@@ -1,10 +1,9 @@
 {
-  "id": "voicenote-plugin",
-  "name": "VoiceNote Plugin",
+  "id": "speaknote",
+  "name": "SpeakNote",
   "version": "0.0.1",
   "minAppVersion": "1.0.0",
-  "description": "A simple test plugin",
+  "description": "🎙️ Record and save voice notes directly inside Obsidian",
   "author": "Wael Heni",
-  "authorUrl": "",
   "isDesktopOnly": true
 }
