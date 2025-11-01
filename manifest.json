@@ -1,0 +1,10 @@
+{
+  "id": "voicenote-plugin",
+  "name": "VoiceNote Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.0.0",
+  "description": "A simple test plugin",
+  "author": "Wael Heni",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}
