@@ -1,1 +1,16 @@
-/* optional, empty */
+/* SpeakNote ribbon icon styling */
+.speaknote-ribbon {
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+/* When recording is active */
+.speaknote-ribbon.recording {
+  color: #e74c3c !important; /* force red */
+  transform: scale(1.15);
+  animation: speaknote-pulse 1.2s infinite;
+}
+
+@keyframes speaknote-pulse {
+  0%, 100% { transform: scale(1.0); }
+  50% { transform: scale(1.15); }
+}

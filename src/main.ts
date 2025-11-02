@@ -5,17 +5,18 @@ export default class SpeakNotePlugin extends Plugin {
   private chunks: BlobPart[] = [];
   private isRecording = false;
   private lastSavedFile: TFile | null = null;
+  private ribbonIconEl: HTMLElement | null = null;
 
   async onload() {
     console.log("✅ SpeakNote plugin loaded");
 
     // Ribbon icon (top-left)
-    const ribbonIcon = this.addRibbonIcon(
+    this.ribbonIconEl = this.addRibbonIcon(
       "mic",
       "SpeakNote: Record / Stop",
       () => this.toggleRecording()
     );
-    ribbonIcon.addClass("speaknote-ribbon");
+    this.ribbonIconEl.addClass("speaknote-ribbon");
 
     // Start / Stop command
     this.addCommand({
@@ -62,6 +63,7 @@ export default class SpeakNotePlugin extends Plugin {
 
       this.mediaRecorder.start();
       this.isRecording = true;
+      this.ribbonIconEl?.classList.add("recording");
       new Notice("🎤 Recording started...");
       console.log("🎙️ Recording started");
     } catch (err) {
@@ -74,6 +76,7 @@ export default class SpeakNotePlugin extends Plugin {
     if (this.mediaRecorder && this.isRecording) {
       this.mediaRecorder.stop();
       this.isRecording = false;
+      this.ribbonIconEl?.classList.remove("recording");
       new Notice("💾 Recording stopped, saving file...");
       console.log("🛑 Recording stopped");
     }
