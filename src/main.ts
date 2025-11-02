@@ -158,19 +158,18 @@ showFloatingPlayer(url: string) {
   const container = document.createElement("div");
   container.className = "speaknote-player";
 
-  // Create audio
+  // Create audio element
   const audio = document.createElement("audio");
   audio.src = url;
   audio.controls = true;
   audio.autoplay = true;
-
   container.appendChild(audio);
 
   // ✅ Attach to Obsidian's main workspace container (most reliable)
   const target =
-    this.app.workspace.containerEl || // Obsidian container
-    document.querySelector(".workspace") || // fallback to workspace
-    document.body; // final fallback
+    this.app.workspace.containerEl ||
+    document.querySelector(".workspace") ||
+    document.body;
 
   if (!target) {
     console.error("❌ No target container to attach player");
@@ -179,10 +178,18 @@ showFloatingPlayer(url: string) {
 
   target.appendChild(container);
   console.log("✅ Player appended to:", target);
-  console.log("✅ Player node now in DOM?", !!document.querySelector(".speaknote-player"));
 
-  // For debugging: don't remove it automatically yet
-  // audio.addEventListener("ended", () => container.remove());
+  // 🕐 Auto-close timer (5 seconds after playback ends)
+  audio.addEventListener("ended", () => {
+    console.log("🕐 Playback ended, will close in 5s...");
+    setTimeout(() => {
+    if (container.isConnected) {
+      container.style.animation = "speaknote-fade-out 0.5s forwards";
+      setTimeout(() => container.remove(), 500);
+      console.log("🧹 Player faded out and removed");
+    }
+    }, 5000);
+    });
 
   return container;
 }

@@ -158,16 +158,23 @@ var SpeakNotePlugin = class extends import_obsidian.Plugin {
     audio.controls = true;
     audio.autoplay = true;
     container.appendChild(audio);
-    const target = this.app.workspace.containerEl || // Obsidian container
-    document.querySelector(".workspace") || // fallback to workspace
-    document.body;
+    const target = this.app.workspace.containerEl || document.querySelector(".workspace") || document.body;
     if (!target) {
       console.error("\u274C No target container to attach player");
       return null;
     }
     target.appendChild(container);
     console.log("\u2705 Player appended to:", target);
-    console.log("\u2705 Player node now in DOM?", !!document.querySelector(".speaknote-player"));
+    audio.addEventListener("ended", () => {
+      console.log("\u{1F550} Playback ended, will close in 5s...");
+      setTimeout(() => {
+        if (container.isConnected) {
+          container.style.animation = "speaknote-fade-out 0.5s forwards";
+          setTimeout(() => container.remove(), 500);
+          console.log("\u{1F9F9} Player faded out and removed");
+        }
+      }, 5e3);
+    });
     return container;
   }
 };
