@@ -14,3 +14,35 @@
   0%, 100% { transform: scale(1.0); }
   50% { transform: scale(1.15); }
 }
+
+
+
+/* Floating audio player - clear and visible */
+.speaknote-player {
+  position: fixed !important;
+  bottom: 2.5rem !important;       /* Move it higher above the edge */
+  right: 2rem !important;          /* Shift left a bit */
+  z-index: 2147483647 !important;  /* Stay on top of everything */
+  background: var(--background-primary-alt, #222) !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 250px;
+  animation: speaknote-slide-up 0.3s ease-out;
+  opacity: 0.98;
+}
+
+/* Make the audio element fill neatly */
+.speaknote-player audio {
+  width: 100%;
+}
+
+/* Entrance animation */
+@keyframes speaknote-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

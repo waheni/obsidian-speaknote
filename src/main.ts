@@ -125,20 +125,65 @@ export default class SpeakNotePlugin extends Plugin {
   }
 
   async playRecording(file: TFile) {
-    try {
-      const data = await this.app.vault.readBinary(file);
-      const blob = new Blob([data], { type: "audio/webm" });
-      const url = URL.createObjectURL(blob);
+  try {
+    const data = await this.app.vault.readBinary(file);
+    const blob = new Blob([data], { type: "audio/webm" });
+    const url = URL.createObjectURL(blob);
 
-      const audio = new Audio(url);
-      audio.controls = true;
-      audio.play();
+    console.log("🎧 Calling showFloatingPlayer with", url);
+    const el = this.showFloatingPlayer(url);
+    console.log("🎧 showFloatingPlayer returned:", el);
 
-      new Notice(`▶️ Playing ${file.name}`);
-      console.log("▶️ Playing:", file.name);
-    } catch (err) {
-      console.error(err);
-      new Notice("❌ Unable to play audio file.");
-    }
+    // Double-check after next tick
+    setTimeout(() => {
+      console.log(
+        "🔎 After 0ms, exists?",
+        !!document.querySelector(".speaknote-player")
+      );
+    }, 0);
+
+    new Notice(`▶️ Playing ${file.name}`);
+  } catch (err) {
+    console.error(err);
+    new Notice("❌ Unable to play audio file.");
   }
+  }
+showFloatingPlayer(url: string) {
+  console.log("📢 showFloatingPlayer CALLED:", url);
+
+  // Remove any previous player
+  document.querySelector(".speaknote-player")?.remove();
+
+  // Create container
+  const container = document.createElement("div");
+  container.className = "speaknote-player";
+
+  // Create audio
+  const audio = document.createElement("audio");
+  audio.src = url;
+  audio.controls = true;
+  audio.autoplay = true;
+
+  container.appendChild(audio);
+
+  // ✅ Attach to Obsidian's main workspace container (most reliable)
+  const target =
+    this.app.workspace.containerEl || // Obsidian container
+    document.querySelector(".workspace") || // fallback to workspace
+    document.body; // final fallback
+
+  if (!target) {
+    console.error("❌ No target container to attach player");
+    return null;
+  }
+
+  target.appendChild(container);
+  console.log("✅ Player appended to:", target);
+  console.log("✅ Player node now in DOM?", !!document.querySelector(".speaknote-player"));
+
+  // For debugging: don't remove it automatically yet
+  // audio.addEventListener("ended", () => container.remove());
+
+  return container;
+}
 }
