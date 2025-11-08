@@ -199,6 +199,14 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
       console.error("Save error:", err);
       new import_obsidian2.Notice("\u274C Failed to save recording.");
     }
+    try {
+      console.log("\u2699\uFE0F Mock transcription active (no API key)");
+      await new Promise((r) => setTimeout(r, 2e3));
+      return "\u{1F9E0} [Mock Transcript]\nThis is a simulated transcription result.";
+    } catch (err) {
+      console.error("Transcription error:", err);
+      new import_obsidian2.Notice("\u26A0\uFE0F Transcription failed.");
+    }
   }
   async playRecording(file) {
     try {

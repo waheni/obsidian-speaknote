@@ -1,6 +1,7 @@
 import { Plugin, Notice, TFile } from "obsidian";
 import { ensureFolder, saveBinary } from "./vaultUtils";
 import { SpeakNoteSettingTab, DEFAULT_SETTINGS, SpeakNoteSettings } from "./settings";
+import { transcribeAudio } from "./transcribe";
 
 export default class SpeakNotePlugin extends Plugin {
   private mediaRecorder: MediaRecorder | null = null;
@@ -144,6 +145,25 @@ async saveRecording(blob: Blob) {
     console.error("Save error:", err);
     new Notice("❌ Failed to save recording.");
   }
+
+  // 🔹 Optional: Auto-transcribe after saving
+try {
+  if (this.settings.autoTranscribe && this.settings.openaiApiKey) {
+    new Notice("🧠 Transcribing your recording...");
+    const text = await transcribeAudio(this.settings.openaiApiKey, blob);
+    const transcriptPath = filename.replace(".webm", ".md");
+    await this.app.vault.create(transcriptPath, text);
+    new Notice(`✅ Transcript saved as: ${transcriptPath}`);
+  }
+  else{
+
+        new Notice("🧠 There is no Key...");
+
+  }
+} catch (err) {
+  console.error("Transcription error:", err);
+  new Notice("⚠️ Transcription failed.");
+}
 }
 
   async playRecording(file: TFile) {
