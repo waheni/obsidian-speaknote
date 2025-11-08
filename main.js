@@ -23,8 +23,65 @@ __export(main_exports, {
   default: () => SpeakNotePlugin
 });
 module.exports = __toCommonJS(main_exports);
+var import_obsidian2 = require("obsidian");
+
+// src/vaultUtils.ts
+async function ensureFolder(app, path) {
+  const folder = app.vault.getAbstractFileByPath(path);
+  if (!folder) await app.vault.createFolder(path);
+}
+async function saveBinary(app, path, data) {
+  try {
+    return await app.vault.createBinary(path, data);
+  } catch (err) {
+    if (err.message.includes("already exists")) {
+      const [name, ext] = path.split(".");
+      const alt = `${name}_${Math.floor(Math.random() * 1e3)}.${ext}`;
+      return await app.vault.createBinary(alt, data);
+    }
+    throw err;
+  }
+}
+
+// src/settings.ts
 var import_obsidian = require("obsidian");
-var SpeakNotePlugin = class extends import_obsidian.Plugin {
+var DEFAULT_SETTINGS = {
+  openaiApiKey: "",
+  defaultFolder: "SpeakNotes",
+  autoTranscribe: false
+};
+var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    containerEl.createEl("h2", { text: "SpeakNote Settings" });
+    new import_obsidian.Setting(containerEl).setName("OpenAI API Key").setDesc("Used for cloud transcription requests").addText(
+      (text) => text.setPlaceholder("sk-\u2026").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+        this.plugin.settings.openaiApiKey = value.trim();
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Recordings folder").setDesc("Where to save audio files").addText(
+      (text) => text.setValue(this.plugin.settings.defaultFolder).onChange(async (value) => {
+        this.plugin.settings.defaultFolder = value.trim();
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Auto-transcribe after saving").setDesc("Automatically transcribe each new recording to text").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.autoTranscribe).onChange(async (value) => {
+        this.plugin.settings.autoTranscribe = value;
+        await this.plugin.saveSettings();
+      })
+    );
+  }
+};
+
+// src/main.ts
+var SpeakNotePlugin = class extends import_obsidian2.Plugin {
   constructor() {
     super(...arguments);
     this.mediaRecorder = null;
@@ -32,9 +89,12 @@ var SpeakNotePlugin = class extends import_obsidian.Plugin {
     this.isRecording = false;
     this.lastSavedFile = null;
     this.ribbonIconEl = null;
+    this.isBusy = false;
   }
   async onload() {
     console.log("\u2705 SpeakNote plugin loaded");
+    await this.loadSettings();
+    this.addSettingTab(new SpeakNoteSettingTab(this.app, this));
     this.ribbonIconEl = this.addRibbonIcon(
       "mic",
       "SpeakNote: Record / Stop",
@@ -53,19 +113,21 @@ var SpeakNotePlugin = class extends import_obsidian.Plugin {
         if (this.lastSavedFile) {
           await this.playRecording(this.lastSavedFile);
         } else {
-          new import_obsidian.Notice("No recent recording found");
+          new import_obsidian2.Notice("No recent recording found");
         }
       }
     });
   }
+  async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
   onunload() {
     console.log("\u{1F9F9} SpeakNote plugin unloaded");
   }
-  async toggleRecording() {
-    if (this.isRecording) {
-      this.stopRecording();
-      return;
-    }
+  async startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.mediaRecorder = new MediaRecorder(stream);
@@ -78,54 +140,64 @@ var SpeakNotePlugin = class extends import_obsidian.Plugin {
       this.mediaRecorder.start();
       this.isRecording = true;
       this.ribbonIconEl?.classList.add("recording");
-      new import_obsidian.Notice("\u{1F3A4} Recording started...");
-      console.log("\u{1F399}\uFE0F Recording started");
+      new import_obsidian2.Notice("\u{1F3A4} Recording started...");
     } catch (err) {
       console.error(err);
-      new import_obsidian.Notice("\u274C Microphone access denied or unavailable.");
+      new import_obsidian2.Notice("\u274C Microphone access denied or unavailable.");
+    }
+  }
+  async toggleRecording() {
+    if (this.isBusy) {
+      new import_obsidian2.Notice("\u23F3 Please wait...");
+      return;
+    }
+    this.isBusy = true;
+    this.ribbonIconEl?.addClass("disabled");
+    setTimeout(() => this.ribbonIconEl?.removeClass("disabled"), 500);
+    try {
+      if (this.isRecording) {
+        this.stopRecording();
+      } else {
+        await this.startRecording();
+      }
+    } catch (err) {
+      console.error("Toggle error:", err);
+      new import_obsidian2.Notice("\u274C Failed to toggle recording.");
+    } finally {
+      setTimeout(() => this.isBusy = false, 500);
     }
   }
   stopRecording() {
     if (this.mediaRecorder && this.isRecording) {
-      this.mediaRecorder.stop();
-      this.isRecording = false;
-      this.ribbonIconEl?.classList.remove("recording");
-      new import_obsidian.Notice("\u{1F4BE} Recording stopped, saving file...");
-      console.log("\u{1F6D1} Recording stopped");
+      try {
+        this.mediaRecorder.stop();
+        this.isRecording = false;
+        if (this.mediaRecorder.stream) {
+          this.mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+        }
+        this.ribbonIconEl?.classList.remove("recording");
+        new import_obsidian2.Notice("\u{1F4BE} Recording stopped, saving file...");
+        console.log("\u{1F6D1} Recording stopped and stream released");
+      } catch (err) {
+        console.error("\u274C Error while stopping recording:", err);
+        new import_obsidian2.Notice("\u274C Could not stop recording cleanly");
+      }
     }
   }
   async saveRecording(blob) {
     try {
       const folderPath = "SpeakNotes";
-      const folder = this.app.vault.getAbstractFileByPath(folderPath);
-      if (!folder) {
-        await this.app.vault.createFolder(folderPath);
-      }
+      await ensureFolder(this.app, folderPath);
       const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
       const filename = `${folderPath}/${timestamp}.webm`;
-      const arrayBuffer = await blob.arrayBuffer();
-      const buffer = new Uint8Array(arrayBuffer);
-      const newFile = await this.app.vault.createBinary(filename, buffer);
+      const buffer = new Uint8Array(await blob.arrayBuffer());
+      const newFile = await saveBinary(this.app, filename, buffer);
       this.lastSavedFile = newFile;
-      new import_obsidian.Notice(`\u2705 Saved: ${filename}`);
+      new import_obsidian2.Notice(`\u2705 Saved: ${filename}`);
       console.log("\u2705 File saved:", filename);
     } catch (err) {
-      if (err.message.includes("already exists")) {
-        const fallback = `${window.moment().format(
-          "YYYY-MM-DD_HH-mm-ss"
-        )}_${Math.floor(Math.random() * 1e3)}.webm`;
-        const buffer = new Uint8Array(await blob.arrayBuffer());
-        const newFile = await this.app.vault.createBinary(
-          `SpeakNotes/${fallback}`,
-          buffer
-        );
-        this.lastSavedFile = newFile;
-        new import_obsidian.Notice(`\u26A0\uFE0F File existed. Saved as: ${fallback}`);
-        console.warn("Duplicate prevented, saved as:", fallback);
-      } else {
-        console.error("Save error:", err);
-        new import_obsidian.Notice("\u274C Failed to save recording.");
-      }
+      console.error("Save error:", err);
+      new import_obsidian2.Notice("\u274C Failed to save recording.");
     }
   }
   async playRecording(file) {
@@ -142,10 +214,10 @@ var SpeakNotePlugin = class extends import_obsidian.Plugin {
           !!document.querySelector(".speaknote-player")
         );
       }, 0);
-      new import_obsidian.Notice(`\u25B6\uFE0F Playing ${file.name}`);
+      new import_obsidian2.Notice(`\u25B6\uFE0F Playing ${file.name}`);
     } catch (err) {
       console.error(err);
-      new import_obsidian.Notice("\u274C Unable to play audio file.");
+      new import_obsidian2.Notice("\u274C Unable to play audio file.");
     }
   }
   showFloatingPlayer(url) {

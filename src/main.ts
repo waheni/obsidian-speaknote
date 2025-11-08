@@ -1,4 +1,6 @@
 import { Plugin, Notice, TFile } from "obsidian";
+import { ensureFolder, saveBinary } from "./vaultUtils";
+import { SpeakNoteSettingTab, DEFAULT_SETTINGS, SpeakNoteSettings } from "./settings";
 
 export default class SpeakNotePlugin extends Plugin {
   private mediaRecorder: MediaRecorder | null = null;
@@ -6,10 +8,15 @@ export default class SpeakNotePlugin extends Plugin {
   private isRecording = false;
   private lastSavedFile: TFile | null = null;
   private ribbonIconEl: HTMLElement | null = null;
+  settings: SpeakNoteSettings;
+  private isBusy = false;
+
 
   async onload() {
     console.log("✅ SpeakNote plugin loaded");
-
+    
+    await this.loadSettings();
+    this.addSettingTab(new SpeakNoteSettingTab(this.app, this));
     // Ribbon icon (top-left)
     this.ribbonIconEl = this.addRibbonIcon(
       "mic",
@@ -39,17 +46,19 @@ export default class SpeakNotePlugin extends Plugin {
     });
   }
 
+  async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
   onunload() {
     console.log("🧹 SpeakNote plugin unloaded");
   }
-
-  async toggleRecording() {
-    if (this.isRecording) {
-      this.stopRecording();
-      return;
-    }
-
+  async startRecording() {
     try {
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.mediaRecorder = new MediaRecorder(stream);
       this.chunks = [];
@@ -57,72 +66,85 @@ export default class SpeakNotePlugin extends Plugin {
       this.mediaRecorder.ondataavailable = (e) => this.chunks.push(e.data);
 
       this.mediaRecorder.onstop = async () => {
-        const blob = new Blob(this.chunks, { type: "audio/webm" });
-        await this.saveRecording(blob);
-      };
+      const blob = new Blob(this.chunks, { type: "audio/webm" });
+      await this.saveRecording(blob);
+    };
 
-      this.mediaRecorder.start();
-      this.isRecording = true;
-      this.ribbonIconEl?.classList.add("recording");
-      new Notice("🎤 Recording started...");
-      console.log("🎙️ Recording started");
-    } catch (err) {
-      console.error(err);
-      new Notice("❌ Microphone access denied or unavailable.");
+    this.mediaRecorder.start();
+    this.isRecording = true;
+    this.ribbonIconEl?.classList.add("recording");
+    new Notice("🎤 Recording started...");
+  } catch (err) {
+    console.error(err);
+    new Notice("❌ Microphone access denied or unavailable.");
+  }
+  }
+  async toggleRecording() {
+  // 🧱 Prevent spamming clicks
+  if (this.isBusy) {
+    new Notice("⏳ Please wait...");
+    return;
+  }
+  this.isBusy = true;
+  // 🟡 Temporarily disable the ribbon button (optional but nice UX)
+  this.ribbonIconEl?.addClass("disabled");
+  setTimeout(() => this.ribbonIconEl?.removeClass("disabled"), 500);
+  try {
+    if (this.isRecording) {
+      this.stopRecording();
+    } else {
+      await this.startRecording();
     }
+  } catch (err) {
+    console.error("Toggle error:", err);
+    new Notice("❌ Failed to toggle recording.");
+  } finally {
+    // ✅ Unlock after short delay
+    setTimeout(() => (this.isBusy = false), 500);
+  }
   }
 
-  stopRecording() {
-    if (this.mediaRecorder && this.isRecording) {
+stopRecording() {
+  if (this.mediaRecorder && this.isRecording) {
+    try {
       this.mediaRecorder.stop();
       this.isRecording = false;
+
+      // 🧹 Release audio input stream (important for privacy + resource cleanup)
+      if (this.mediaRecorder.stream) {
+        this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      }
+
+      // 🟥 Update ribbon icon + user feedback
       this.ribbonIconEl?.classList.remove("recording");
       new Notice("💾 Recording stopped, saving file...");
-      console.log("🛑 Recording stopped");
-    }
-  }
-
-  async saveRecording(blob: Blob) {
-    try {
-      const folderPath = "SpeakNotes";
-      const folder = this.app.vault.getAbstractFileByPath(folderPath);
-
-      if (!folder) {
-        await this.app.vault.createFolder(folderPath);
-      }
-
-      const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
-      const filename = `${folderPath}/${timestamp}.webm`;
-
-      const arrayBuffer = await blob.arrayBuffer();
-      const buffer = new Uint8Array(arrayBuffer);
-
-      // Create the binary file once
-      const newFile = await this.app.vault.createBinary(filename, buffer);
-      this.lastSavedFile = newFile;
-
-      new Notice(`✅ Saved: ${filename}`);
-      console.log("✅ File saved:", filename);
+      console.log("🛑 Recording stopped and stream released");
     } catch (err) {
-      // If file exists, add random suffix to avoid conflict
-      if ((err as Error).message.includes("already exists")) {
-        const fallback = `${window.moment().format(
-          "YYYY-MM-DD_HH-mm-ss"
-        )}_${Math.floor(Math.random() * 1000)}.webm`;
-        const buffer = new Uint8Array(await blob.arrayBuffer());
-        const newFile = await this.app.vault.createBinary(
-          `SpeakNotes/${fallback}`,
-          buffer
-        );
-        this.lastSavedFile = newFile;
-        new Notice(`⚠️ File existed. Saved as: ${fallback}`);
-        console.warn("Duplicate prevented, saved as:", fallback);
-      } else {
-        console.error("Save error:", err);
-        new Notice("❌ Failed to save recording.");
-      }
+      console.error("❌ Error while stopping recording:", err);
+      new Notice("❌ Could not stop recording cleanly");
     }
   }
+}
+
+async saveRecording(blob: Blob) {
+  try {
+    const folderPath = "SpeakNotes";
+    await ensureFolder(this.app, folderPath);
+
+    const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
+    const filename = `${folderPath}/${timestamp}.webm`;
+
+    const buffer = new Uint8Array(await blob.arrayBuffer());
+    const newFile = await saveBinary(this.app, filename, buffer);
+    this.lastSavedFile = newFile;
+
+    new Notice(`✅ Saved: ${filename}`);
+    console.log("✅ File saved:", filename);
+  } catch (err) {
+    console.error("Save error:", err);
+    new Notice("❌ Failed to save recording.");
+  }
+}
 
   async playRecording(file: TFile) {
   try {
