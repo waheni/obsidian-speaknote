@@ -116,6 +116,30 @@ async function transcribeAudio(apiKey, blob) {
   if (!data.text) throw new Error("Empty transcription result");
   return data.text;
 }
+async function transcribeWithDeepgram(apiKey, blob) {
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const response = await fetch("https://api.deepgram.com/v1/listen?model=nova-3", {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${apiKey}`
+      },
+      body: arrayBuffer
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Deepgram error: ${errorText}`);
+    }
+    const data = await response.json();
+    const transcript = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim();
+    if (!transcript) throw new Error("No transcript returned by Deepgram");
+    console.log("\u2705 Deepgram transcript:", transcript);
+    return transcript;
+  } catch (err) {
+    console.error("\u274C Deepgram transcription failed:", err);
+    throw err;
+  }
+}
 
 // src/main.ts
 var SpeakNotePlugin = class extends import_obsidian2.Plugin {
@@ -226,29 +250,40 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
       const folderPath = "SpeakNotes";
       await ensureFolder(this.app, folderPath);
       const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
-      const filename2 = `${folderPath}/${timestamp}.webm`;
+      const filename = `${folderPath}/${timestamp}.webm`;
       const buffer = new Uint8Array(await blob.arrayBuffer());
-      const newFile = await saveBinary(this.app, filename2, buffer);
+      const newFile = await saveBinary(this.app, filename, buffer);
       this.lastSavedFile = newFile;
-      new import_obsidian2.Notice(`\u2705 Saved: ${filename2}`);
-      console.log("\u2705 File saved:", filename2);
+      new import_obsidian2.Notice(`\u2705 Saved: ${filename}`);
+      console.log("\u2705 File saved:", filename);
+      if (this.settings.autoTranscribe) {
+        try {
+          let text = "";
+          if (this.settings.provider === "Deepgram" && this.settings.deepgramApiKey) {
+            new import_obsidian2.Notice("\u{1F9E0} Transcribing with Deepgram...");
+            text = await transcribeWithDeepgram(
+              this.settings.deepgramApiKey,
+              blob
+            );
+          } else if (this.settings.provider === "OpenAI" && this.settings.openaiApiKey) {
+            new import_obsidian2.Notice("\u{1F9E0} Transcribing with OpenAI...");
+            text = await transcribeAudio(this.settings.openaiApiKey, blob);
+          } else {
+            new import_obsidian2.Notice("\u26A0\uFE0F Missing API key for transcription provider.");
+          }
+          if (text) {
+            const transcriptPath = filename.replace(".webm", ".md");
+            await this.app.vault.create(transcriptPath, text);
+            new import_obsidian2.Notice(`\u2705 Transcript saved: ${transcriptPath}`);
+          }
+        } catch (err) {
+          console.error("Transcription error:", err);
+          new import_obsidian2.Notice("\u26A0\uFE0F Transcription failed.");
+        }
+      }
     } catch (err) {
       console.error("Save error:", err);
       new import_obsidian2.Notice("\u274C Failed to save recording.");
-    }
-    try {
-      if (this.settings.autoTranscribe && this.settings.openaiApiKey) {
-        new import_obsidian2.Notice("\u{1F9E0} Transcribing your recording...");
-        const text = await transcribeAudio(this.settings.openaiApiKey, blob);
-        const transcriptPath = filename.replace(".webm", ".md");
-        await this.app.vault.create(transcriptPath, text);
-        new import_obsidian2.Notice(`\u2705 Transcript saved as: ${transcriptPath}`);
-      } else {
-        new import_obsidian2.Notice("\u{1F9E0} There is no Key...");
-      }
-    } catch (err) {
-      console.error("Transcription error:", err);
-      new import_obsidian2.Notice("\u26A0\uFE0F Transcription failed.");
     }
   }
   async playRecording(file) {
