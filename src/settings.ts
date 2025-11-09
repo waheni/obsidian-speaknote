@@ -1,14 +1,22 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import SpeakNotePlugin from "./main";
 
+export type Provider = "OpenAI" | "Deepgram";
+
 export interface SpeakNoteSettings {
+
+  provider: Provider;
   openaiApiKey: string;
+  deepgramApiKey: string;
   defaultFolder: string;
   autoTranscribe: boolean;
 }
 
 export const DEFAULT_SETTINGS: SpeakNoteSettings = {
+  
+  provider: "Deepgram",
   openaiApiKey: "",
+  deepgramApiKey: "",
   defaultFolder: "SpeakNotes",
   autoTranscribe: false,
 };
@@ -27,6 +35,38 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "SpeakNote Settings" });
 
+    // Provider selection
+   new Setting(containerEl)
+   .setName("Transcription Provider")
+   .setDesc("Choose which API to use for transcription")
+   .addDropdown(drop => 
+    drop
+      .addOption("OpenAI", "OpenAI Whisper")
+      .addOption("Deepgram", "Deepgram Nova")
+      .setValue(this.plugin.settings.provider)
+      .onChange(async (value) => {
+        this.plugin.settings.provider = value as Provider;
+        await this.plugin.saveSettings();
+        this.display(); // refresh UI to show correct fields
+      })
+    );
+
+    // Deepgram API Key
+    if (this.plugin.settings.provider === "Deepgram") {
+        new Setting(containerEl)
+        .setName("Deepgram API Key")
+        .setDesc("Used for Deepgram transcriptions")
+        .addText(text =>
+         text
+            .setPlaceholder("dg_...")
+            .setValue(this.plugin.settings.deepgramApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.deepgramApiKey = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+      }
+      else{
     // OpenAI API Key input
     new Setting(containerEl)
       .setName("OpenAI API Key")
@@ -40,7 +80,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
-
+    }
     // Default folder path
     new Setting(containerEl)
       .setName("Recordings folder")

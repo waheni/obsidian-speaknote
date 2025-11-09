@@ -46,7 +46,9 @@ async function saveBinary(app, path, data) {
 // src/settings.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
+  provider: "Deepgram",
   openaiApiKey: "",
+  deepgramApiKey: "",
   defaultFolder: "SpeakNotes",
   autoTranscribe: false
 };
@@ -59,12 +61,28 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "SpeakNote Settings" });
-    new import_obsidian.Setting(containerEl).setName("OpenAI API Key").setDesc("Used for cloud transcription requests").addText(
-      (text) => text.setPlaceholder("sk-\u2026").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
-        this.plugin.settings.openaiApiKey = value.trim();
+    new import_obsidian.Setting(containerEl).setName("Transcription Provider").setDesc("Choose which API to use for transcription").addDropdown(
+      (drop) => drop.addOption("OpenAI", "OpenAI Whisper").addOption("Deepgram", "Deepgram Nova").setValue(this.plugin.settings.provider).onChange(async (value) => {
+        this.plugin.settings.provider = value;
         await this.plugin.saveSettings();
+        this.display();
       })
     );
+    if (this.plugin.settings.provider === "Deepgram") {
+      new import_obsidian.Setting(containerEl).setName("Deepgram API Key").setDesc("Used for Deepgram transcriptions").addText(
+        (text) => text.setPlaceholder("dg_...").setValue(this.plugin.settings.deepgramApiKey).onChange(async (value) => {
+          this.plugin.settings.deepgramApiKey = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+    } else {
+      new import_obsidian.Setting(containerEl).setName("OpenAI API Key").setDesc("Used for cloud transcription requests").addText(
+        (text) => text.setPlaceholder("sk-\u2026").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+          this.plugin.settings.openaiApiKey = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+    }
     new import_obsidian.Setting(containerEl).setName("Recordings folder").setDesc("Where to save audio files").addText(
       (text) => text.setValue(this.plugin.settings.defaultFolder).onChange(async (value) => {
         this.plugin.settings.defaultFolder = value.trim();
@@ -79,6 +97,25 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
     );
   }
 };
+
+// src/transcribe.ts
+async function transcribeAudio(apiKey, blob) {
+  const formData = new FormData();
+  formData.append("file", blob, "audio.webm");
+  formData.append("model", "whisper-1");
+  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: formData
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Transcription failed: ${errorText}`);
+  }
+  const data = await response.json();
+  if (!data.text) throw new Error("Empty transcription result");
+  return data.text;
+}
 
 // src/main.ts
 var SpeakNotePlugin = class extends import_obsidian2.Plugin {
@@ -189,20 +226,26 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
       const folderPath = "SpeakNotes";
       await ensureFolder(this.app, folderPath);
       const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
-      const filename = `${folderPath}/${timestamp}.webm`;
+      const filename2 = `${folderPath}/${timestamp}.webm`;
       const buffer = new Uint8Array(await blob.arrayBuffer());
-      const newFile = await saveBinary(this.app, filename, buffer);
+      const newFile = await saveBinary(this.app, filename2, buffer);
       this.lastSavedFile = newFile;
-      new import_obsidian2.Notice(`\u2705 Saved: ${filename}`);
-      console.log("\u2705 File saved:", filename);
+      new import_obsidian2.Notice(`\u2705 Saved: ${filename2}`);
+      console.log("\u2705 File saved:", filename2);
     } catch (err) {
       console.error("Save error:", err);
       new import_obsidian2.Notice("\u274C Failed to save recording.");
     }
     try {
-      console.log("\u2699\uFE0F Mock transcription active (no API key)");
-      await new Promise((r) => setTimeout(r, 2e3));
-      return "\u{1F9E0} [Mock Transcript]\nThis is a simulated transcription result.";
+      if (this.settings.autoTranscribe && this.settings.openaiApiKey) {
+        new import_obsidian2.Notice("\u{1F9E0} Transcribing your recording...");
+        const text = await transcribeAudio(this.settings.openaiApiKey, blob);
+        const transcriptPath = filename.replace(".webm", ".md");
+        await this.app.vault.create(transcriptPath, text);
+        new import_obsidian2.Notice(`\u2705 Transcript saved as: ${transcriptPath}`);
+      } else {
+        new import_obsidian2.Notice("\u{1F9E0} There is no Key...");
+      }
     } catch (err) {
       console.error("Transcription error:", err);
       new import_obsidian2.Notice("\u26A0\uFE0F Transcription failed.");
