@@ -1,8 +1,7 @@
 import { Plugin, Notice, TFile } from "obsidian";
 import { ensureFolder, saveBinary } from "./vaultUtils";
 import { SpeakNoteSettingTab, DEFAULT_SETTINGS, SpeakNoteSettings } from "./settings";
-import { transcribeAudio } from "./transcribe";
-import { transcribeWithDeepgram } from "./transcribe";
+import { transcribeAudio , transcribeWithDeepgram , transcribeWithAssemblyAI} from "./transcribe";
 
 export default class SpeakNotePlugin extends Plugin {
   private mediaRecorder: MediaRecorder | null = null;
@@ -143,44 +142,32 @@ async saveRecording(blob: Blob) {
     new Notice(`✅ Saved: ${filename}`);
     console.log("✅ File saved:", filename);
 
-    // 🔹 Optional: Auto-transcribe after saving
-    if (this.settings.autoTranscribe) {
-      try {
-        let text = "";
+          // 🔹 Optional: Auto-transcribe after saving
+        if (this.settings.autoTranscribe) {
+          new Notice("🧠 Transcribing your recording...");
+          let text = "";
 
-        // Deepgram transcription
-        if (
-          this.settings.provider === "Deepgram" &&
-          this.settings.deepgramApiKey
-        ) {
-          new Notice("🧠 Transcribing with Deepgram...");
-          text = await transcribeWithDeepgram(
-            this.settings.deepgramApiKey,
-            blob
-          );
-        }
-        // OpenAI transcription
-        else if (
-          this.settings.provider === "OpenAI" &&
-          this.settings.openaiApiKey
-        ) {
-          new Notice("🧠 Transcribing with OpenAI...");
-          text = await transcribeAudio(this.settings.openaiApiKey, blob);
-        } else {
-          new Notice("⚠️ Missing API key for transcription provider.");
-        }
+          if (this.settings.provider === "Deepgram" && this.settings.deepgramApiKey) {
+            text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob);
+          } 
+          else if (this.settings.provider === "AssemblyAI" && this.settings.assemblyApiKey) {
+            text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob);
+          } 
+          else if (this.settings.provider === "OpenAI" && this.settings.openaiApiKey) {
+            text = await transcribeAudio(this.settings.openaiApiKey, blob);
+          }
+          else{
+                        console.log(`❌ Error`);
+          }
 
-        // Save transcript if we got text
-        if (text) {
-          const transcriptPath = filename.replace(".webm", ".md");
-          await this.app.vault.create(transcriptPath, text);
-          new Notice(`✅ Transcript saved: ${transcriptPath}`);
+          if (text) {
+            const transcriptPath = filename.replace(".webm", ".md");
+            await this.app.vault.create(transcriptPath, text);
+            new Notice(`✅ Transcript saved as: ${transcriptPath}`);
+          } else {
+            new Notice("⚠️ Transcription failed or empty.");
+          }
         }
-      } catch (err) {
-        console.error("Transcription error:", err);
-        new Notice("⚠️ Transcription failed.");
-      }
-    }
   } catch (err) {
     console.error("Save error:", err);
     new Notice("❌ Failed to save recording.");

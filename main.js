@@ -46,7 +46,8 @@ async function saveBinary(app, path, data) {
 // src/settings.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
-  provider: "Deepgram",
+  provider: "AssemblyAI",
+  assemblyApiKey: "",
   openaiApiKey: "",
   deepgramApiKey: "",
   defaultFolder: "SpeakNotes",
@@ -62,13 +63,20 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "SpeakNote Settings" });
     new import_obsidian.Setting(containerEl).setName("Transcription Provider").setDesc("Choose which API to use for transcription").addDropdown(
-      (drop) => drop.addOption("OpenAI", "OpenAI Whisper").addOption("Deepgram", "Deepgram Nova").setValue(this.plugin.settings.provider).onChange(async (value) => {
+      (drop) => drop.addOption("AssemblyAI", "AssemblyAI").addOption("OpenAI", "OpenAI Whisper").addOption("Deepgram", "Deepgram Nova").setValue(this.plugin.settings.provider).onChange(async (value) => {
         this.plugin.settings.provider = value;
         await this.plugin.saveSettings();
         this.display();
       })
     );
-    if (this.plugin.settings.provider === "Deepgram") {
+    if (this.plugin.settings.provider === "AssemblyAI") {
+      new import_obsidian.Setting(containerEl).setName("AssemblyAI API Key").setDesc("Used for Assembly AI transcriptions").addText(
+        (text) => text.setPlaceholder("e1_...").setValue(this.plugin.settings.assemblyApiKey).onChange(async (value) => {
+          this.plugin.settings.assemblyApiKey = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+    } else if (this.plugin.settings.provider === "Deepgram") {
       new import_obsidian.Setting(containerEl).setName("Deepgram API Key").setDesc("Used for Deepgram transcriptions").addText(
         (text) => text.setPlaceholder("dg_...").setValue(this.plugin.settings.deepgramApiKey).onChange(async (value) => {
           this.plugin.settings.deepgramApiKey = value.trim();
@@ -103,6 +111,7 @@ async function transcribeAudio(apiKey, blob) {
   const formData = new FormData();
   formData.append("file", blob, "audio.webm");
   formData.append("model", "whisper-1");
+  console.log("\u{1F9E0} Using provider:", this.settings.provider);
   const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -118,6 +127,7 @@ async function transcribeAudio(apiKey, blob) {
 }
 async function transcribeWithDeepgram(apiKey, blob) {
   try {
+    console.log("\u{1F3AC} Starting DeepGram transcription...");
     const arrayBuffer = await blob.arrayBuffer();
     const response = await fetch("https://api.deepgram.com/v1/listen?model=nova-3", {
       method: "POST",
@@ -138,6 +148,72 @@ async function transcribeWithDeepgram(apiKey, blob) {
   } catch (err) {
     console.error("\u274C Deepgram transcription failed:", err);
     throw err;
+  }
+}
+async function transcribeWithAssemblyAI(apiKey, blob) {
+  console.log("\u{1F3AC} Starting AssemblyAI transcription...");
+  try {
+    console.log("\u{1F4E4} Uploading audio blob to AssemblyAI...");
+    const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
+      method: "POST",
+      headers: { "Authorization": apiKey },
+      body: blob
+    });
+    if (!uploadRes.ok) {
+      console.error("\u274C Upload failed:", uploadRes.status, await uploadRes.text());
+      throw new Error("Upload failed");
+    }
+    const uploadData = await uploadRes.json();
+    const audioUrl = uploadData.upload_url;
+    console.log("\u2705 Uploaded successfully to:", audioUrl);
+    const requestBody = {
+      audio_url: audioUrl,
+      // ⚠️ must be snake_case
+      language_code: "en",
+      // or "en", "fr", "ar"
+      auto_chapters: false
+    };
+    console.log("\u{1F4E4} Sending transcription request:", requestBody);
+    const transcriptRes = await fetch("https://api.assemblyai.com/v2/transcript", {
+      method: "POST",
+      headers: {
+        "Authorization": apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(requestBody)
+    });
+    const rawResponse = await transcriptRes.text();
+    console.log("\u{1F4E5} Raw response from AssemblyAI:", transcriptRes.status, rawResponse);
+    if (!transcriptRes.ok) {
+      throw new Error(`\u274C Failed to start transcription job: ${rawResponse}`);
+    }
+    const transcriptData = JSON.parse(rawResponse);
+    const transcriptId = transcriptData.id;
+    console.log("\u{1F9E0} Transcription job started:", transcriptId);
+    let text = "";
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 2e3));
+      const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
+        headers: { "Authorization": apiKey }
+      });
+      const pollData = await pollRes.json();
+      console.log(`\u23F3 Polling attempt ${i + 1}:`, pollData.status);
+      if (pollData.status === "completed") {
+        text = pollData.text;
+        console.log("\u2705 Transcription completed");
+        break;
+      } else if (pollData.status === "error") {
+        console.error("\u274C AssemblyAI reported error:", pollData.error);
+        throw new Error(pollData.error);
+      }
+    }
+    if (!text) {
+      throw new Error("Transcription timeout or empty result");
+    }
+    return text;
+  } catch (err) {
+    console.error("\u274C AssemblyAI transcription error:", err);
+    return "";
   }
 }
 
@@ -257,28 +333,23 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
       new import_obsidian2.Notice(`\u2705 Saved: ${filename}`);
       console.log("\u2705 File saved:", filename);
       if (this.settings.autoTranscribe) {
-        try {
-          let text = "";
-          if (this.settings.provider === "Deepgram" && this.settings.deepgramApiKey) {
-            new import_obsidian2.Notice("\u{1F9E0} Transcribing with Deepgram...");
-            text = await transcribeWithDeepgram(
-              this.settings.deepgramApiKey,
-              blob
-            );
-          } else if (this.settings.provider === "OpenAI" && this.settings.openaiApiKey) {
-            new import_obsidian2.Notice("\u{1F9E0} Transcribing with OpenAI...");
-            text = await transcribeAudio(this.settings.openaiApiKey, blob);
-          } else {
-            new import_obsidian2.Notice("\u26A0\uFE0F Missing API key for transcription provider.");
-          }
-          if (text) {
-            const transcriptPath = filename.replace(".webm", ".md");
-            await this.app.vault.create(transcriptPath, text);
-            new import_obsidian2.Notice(`\u2705 Transcript saved: ${transcriptPath}`);
-          }
-        } catch (err) {
-          console.error("Transcription error:", err);
-          new import_obsidian2.Notice("\u26A0\uFE0F Transcription failed.");
+        new import_obsidian2.Notice("\u{1F9E0} Transcribing your recording...");
+        let text = "";
+        if (this.settings.provider === "Deepgram" && this.settings.deepgramApiKey) {
+          text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob);
+        } else if (this.settings.provider === "AssemblyAI" && this.settings.assemblyApiKey) {
+          text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob);
+        } else if (this.settings.provider === "OpenAI" && this.settings.openaiApiKey) {
+          text = await transcribeAudio(this.settings.openaiApiKey, blob);
+        } else {
+          console.log(`\u274C Error`);
+        }
+        if (text) {
+          const transcriptPath = filename.replace(".webm", ".md");
+          await this.app.vault.create(transcriptPath, text);
+          new import_obsidian2.Notice(`\u2705 Transcript saved as: ${transcriptPath}`);
+        } else {
+          new import_obsidian2.Notice("\u26A0\uFE0F Transcription failed or empty.");
         }
       }
     } catch (err) {

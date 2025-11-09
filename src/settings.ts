@@ -1,11 +1,12 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import SpeakNotePlugin from "./main";
 
-export type Provider = "OpenAI" | "Deepgram";
+export type Provider = "AssemblyAI" | "OpenAI" | "Deepgram";
 
 export interface SpeakNoteSettings {
 
   provider: Provider;
+  assemblyApiKey: string;
   openaiApiKey: string;
   deepgramApiKey: string;
   defaultFolder: string;
@@ -14,7 +15,8 @@ export interface SpeakNoteSettings {
 
 export const DEFAULT_SETTINGS: SpeakNoteSettings = {
   
-  provider: "Deepgram",
+  provider: "AssemblyAI",
+  assemblyApiKey: "",
   openaiApiKey: "",
   deepgramApiKey: "",
   defaultFolder: "SpeakNotes",
@@ -41,6 +43,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
    .setDesc("Choose which API to use for transcription")
    .addDropdown(drop => 
     drop
+      .addOption("AssemblyAI", "AssemblyAI")
       .addOption("OpenAI", "OpenAI Whisper")
       .addOption("Deepgram", "Deepgram Nova")
       .setValue(this.plugin.settings.provider)
@@ -51,8 +54,22 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
       })
     );
 
-    // Deepgram API Key
-    if (this.plugin.settings.provider === "Deepgram") {
+    // Assembly AI API Key
+    if (this.plugin.settings.provider === "AssemblyAI") {
+        new Setting(containerEl)
+        .setName("AssemblyAI API Key")
+        .setDesc("Used for Assembly AI transcriptions")
+        .addText(text =>
+         text
+            .setPlaceholder("e1_...")
+            .setValue(this.plugin.settings.assemblyApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.assemblyApiKey = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+      }  // Deepgram API Key
+     else if (this.plugin.settings.provider === "Deepgram") {
         new Setting(containerEl)
         .setName("Deepgram API Key")
         .setDesc("Used for Deepgram transcriptions")
