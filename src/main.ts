@@ -76,8 +76,19 @@ export default class SpeakNotePlugin extends Plugin {
     this.ribbonIconEl?.classList.add("recording");
     new Notice("🎤 Recording started...");
   } catch (err) {
-    console.error(err);
-    new Notice("❌ Microphone access denied or unavailable.");
+    console.error("Microphone error:", err);
+
+    if (err.name === "NotAllowedError") {
+      new Notice("❌ Microphone permission denied.\nEnable the mic in your system settings.");
+    } else if (err.name === "NotFoundError") {
+      new Notice("❌ No microphone detected.\nPlease connect a microphone.");
+    } else if (err.name === "AbortError") {
+      new Notice("❌ Browser blocked microphone access.");
+    } else if (err.name === "NotReadableError") {
+      new Notice("❌ Microphone is busy.\nClose other apps using the mic.");
+    } else {
+      new Notice("❌ Could not start recording.\nUnknown error occurred.");
+    }
   }
   }
   async toggleRecording() {
@@ -148,18 +159,26 @@ async saveRecording(blob: Blob) {
           this.showOverlay("🧠 Transcribing your recording...");
           let text = "";
 
-          if (this.settings.provider === "Deepgram" && this.settings.deepgramApiKey) {
-            text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob);
+          if (this.settings.provider === "Deepgram" ) {
+                if (!this.settings.deepgramApiKey) {
+                     throw new Error("Missing Deepgram API key");
+                } 
+                text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob);
           } 
-          else if (this.settings.provider === "AssemblyAI" && this.settings.assemblyApiKey) {
-            text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob);
+          else if (this.settings.provider === "AssemblyAI" ) {
+
+                    if (!this.settings.assemblyApiKey) {
+                      throw new Error("Missing AssemblyAI API key");
+                    }
+                  text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob);
           } 
-          else if (this.settings.provider === "OpenAI" && this.settings.openaiApiKey) {
+          else if (this.settings.provider === "OpenAI" ) {
+                  if (!this.settings.openaiApiKey) {
+                      throw new Error("Missing OpenAI API key");
+                    }
             text = await transcribeAudio(this.settings.openaiApiKey, blob);
           }
-          else{
-                        console.log(`❌ Error`);
-          }
+
           const elapsed = Date.now() - start;
           if (elapsed < 500) {
             await new Promise(r => setTimeout(r, 500 - elapsed));
@@ -178,10 +197,33 @@ async saveRecording(blob: Blob) {
             new Notice("⚠️ Transcription failed or empty.");
           }
         }
-  } catch (err) {
-    console.error("Save error:", err);
-    new Notice("❌ Failed to save recording.");
+  } catch (apiError: any) {
+  this.hideOverlay();
+  console.error("API Error:", apiError);
+
+  const msg = apiError.message || "";
+
+  if (msg.includes("Missing")) {
+    new Notice("❌ No API key provided.\nPlease enter your API key in Settings → SpeakNote.");
   }
+  else if (msg.includes("Invalid") || msg.includes("401")) {
+    new Notice("❌ Invalid API key.\nPlease verify your key in Settings.");
+  }
+  else if (msg.includes("quota") || msg.includes("limit")) {
+    new Notice("⚠️ API quota exceeded.\nUpgrade your plan or wait for reset.");
+  }
+  else if (msg.includes("language")) {
+    new Notice("⚠️ Selected language not supported by this provider.");
+  }
+  else if (msg.includes("network") || msg.includes("Failed to fetch")) {
+    new Notice("🌐 Network error.\nPlease check your internet connection.");
+  }
+  else {
+    new Notice("❌ Transcription failed.\n(See console for details)");
+  }
+
+  return;
+}
 }
 
   async playRecording(file: TFile) {
