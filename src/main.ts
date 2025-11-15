@@ -206,7 +206,8 @@ async saveRecording(blob: Blob) {
   if (msg.includes("Missing")) {
     new Notice("❌ No API key provided.\nPlease enter your API key in Settings → SpeakNote.");
   }
-  else if (msg.includes("Invalid") || msg.includes("401")) {
+  else if (msg.includes("Invalid") || msg.includes("401") ||   msg.includes("invalid_auth") || msg.includes("invalid_api_key") || msg.includes("incorrect api key")) 
+  {
     new Notice("❌ Invalid API key.\nPlease verify your key in Settings.");
   }
   else if (msg.includes("quota") || msg.includes("limit")) {

@@ -1,148 +1,181 @@
 /**
- * Whisper transcription helper
+ * Utility to normalize ANY provider error into a clear message.
  */
-export async function transcribeAudio(apiKey: string, blob: Blob): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", blob, "audio.webm");
-  formData.append("model", "whisper-1");
-  console.log("🎬 Starting OpenAi transcription...");
+function makeFriendlyError(provider: string, raw: string): string {
+  raw = raw.toLowerCase();
 
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-   method: "POST",
-   headers: { Authorization: `Bearer ${apiKey}` },
-   body: formData,
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Transcription failed: ${errorText}`);
+  if (raw.includes("invalid api key") || raw.includes("invalid credentials") || raw.includes("unauthorized")) {
+    return `${provider}: Invalid API Key. Please check your key.`;
   }
 
-  const data = await response.json();
-  if (!data.text) throw new Error("Empty transcription result");
-  return data.text;
+  if (raw.includes("quota") || raw.includes("limit")) {
+    return `${provider}: You exceeded your quota.`;
+  }
+
+  if (raw.includes("missing") || raw.includes("no api key")) {
+    return `${provider}: API key is missing.`;
+  }
+
+  if (raw.includes("forbidden")) {
+    return `${provider}: Access forbidden (possible wrong project / plan).`;
+  }
+
+  return `${provider}: ${raw}`;
 }
 
-
-/**
- * Deepgram transcription helper
- * Converts audio Blob → text using Deepgram REST API
- */
-export async function transcribeWithDeepgram(apiKey: string, blob: Blob): Promise<string> {
+/* -----------------------------------------------------------
+   OPENAI WHISPER
+----------------------------------------------------------- */
+export async function transcribeAudio(apiKey: string, blob: Blob): Promise<string> {
   try {
-    console.log("🎬 Starting DeepGram transcription...");
+    if (!apiKey) throw new Error("Missing API key");
 
-    // Convert blob to ArrayBuffer
-    const arrayBuffer = await blob.arrayBuffer();
+    const formData = new FormData();
+    formData.append("file", blob, "audio.webm");
+    formData.append("model", "whisper-1");
 
-    // Send to Deepgram API
-    const response = await fetch("https://api.deepgram.com/v1/listen?model=nova-3", {
+    console.log("🎬 Starting OpenAI transcription...");
+
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
-      headers: {
-        Authorization: `Token ${apiKey}`,
-      },
-      body: arrayBuffer,
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: formData,
     });
 
+    const raw = await response.text();
+
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Deepgram error: ${errorText}`);
+      const friendly = makeFriendlyError("OpenAI", raw);
+      throw new Error(friendly);
     }
 
-    const data = await response.json();
+    const data = JSON.parse(raw);
+    if (!data.text) throw new Error("OpenAI returned empty text.");
 
-    // Extract transcript safely
+    return data.text;
+  } catch (err: any) {
+    console.error("❌ OpenAI transcription failed:", err);
+    throw new Error(err.message || "OpenAI transcription error");
+  }
+}
+
+/* -----------------------------------------------------------
+   DEEPGRAM
+----------------------------------------------------------- */
+export async function transcribeWithDeepgram(apiKey: string, blob: Blob): Promise<string> {
+  try {
+    if (!apiKey) throw new Error("Missing API key");
+
+    console.log("🎬 Starting Deepgram transcription...");
+
+    const arrayBuffer = await blob.arrayBuffer();
+
+    const response = await fetch(
+      "https://api.deepgram.com/v1/listen?model=nova-3",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${apiKey}`,
+        },
+        body: arrayBuffer,
+      }
+    );
+
+    const raw = await response.text();
+
+    if (!response.ok) {
+      const friendly = makeFriendlyError("Deepgram", raw);
+      throw new Error(friendly);
+    }
+
+    const data = JSON.parse(raw);
+
     const transcript =
       data?.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim();
 
-    if (!transcript) throw new Error("No transcript returned by Deepgram");
+    if (!transcript) throw new Error("Deepgram returned empty transcript.");
 
-    console.log("✅ Deepgram transcript:", transcript);
     return transcript;
-  } catch (err) {
+  } catch (err: any) {
     console.error("❌ Deepgram transcription failed:", err);
-    throw err;
+    throw new Error(err.message || "Deepgram transcription error");
   }
 }
 
+/* -----------------------------------------------------------
+   ASSEMBLYAI
+----------------------------------------------------------- */
 export async function transcribeWithAssemblyAI(apiKey: string, blob: Blob): Promise<string> {
-  console.log("🎬 Starting AssemblyAI transcription...");
-
   try {
-    // 1️⃣ Upload the audio
-    console.log("📤 Uploading audio blob to AssemblyAI...");
+    if (!apiKey) throw new Error("Missing API key");
+
+    console.log("🎬 Starting AssemblyAI transcription...");
+
+    // Upload
     const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
       method: "POST",
       headers: { "Authorization": apiKey },
       body: blob,
     });
 
+    const uploadRaw = await uploadRes.text();
+
     if (!uploadRes.ok) {
-      console.error("❌ Upload failed:", uploadRes.status, await uploadRes.text());
-      throw new Error("Upload failed");
+      const friendly = makeFriendlyError("AssemblyAI", uploadRaw);
+      throw new Error(friendly);
     }
 
-    const uploadData = await uploadRes.json();
+    const uploadData = JSON.parse(uploadRaw);
     const audioUrl = uploadData.upload_url;
-    console.log("✅ Uploaded successfully to:", audioUrl);
 
-    // 2️⃣ Create the transcription request
-    const requestBody = {
-      audio_url: audioUrl, // ⚠️ must be snake_case
-      language_code: "en", // or "en", "fr", "ar"
+    // Start job
+    const body = {
+      audio_url: audioUrl,
+      language_code: "en",
       auto_chapters: false,
     };
 
-    console.log("📤 Sending transcription request:", requestBody);
-
-    const transcriptRes = await fetch("https://api.assemblyai.com/v2/transcript", {
+    const jobRes = await fetch("https://api.assemblyai.com/v2/transcript", {
       method: "POST",
       headers: {
         "Authorization": apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify(body),
     });
 
-    const rawResponse = await transcriptRes.text();
-    console.log("📥 Raw response from AssemblyAI:", transcriptRes.status, rawResponse);
+    const rawJob = await jobRes.text();
 
-    if (!transcriptRes.ok) {
-      throw new Error(`❌ Failed to start transcription job: ${rawResponse}`);
+    if (!jobRes.ok) {
+      const friendly = makeFriendlyError("AssemblyAI", rawJob);
+      throw new Error(friendly);
     }
 
-    const transcriptData = JSON.parse(rawResponse);
-    const transcriptId = transcriptData.id;
-    console.log("🧠 Transcription job started:", transcriptId);
+    const jobData = JSON.parse(rawJob);
+    const jobId = jobData.id;
 
-    // 3️⃣ Poll until the transcription is ready
-    let text = "";
+    // Poll
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 2000));
-      const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
-        headers: { "Authorization": apiKey },
-      });
 
-      const pollData = await pollRes.json();
-      console.log(`⏳ Polling attempt ${i + 1}:`, pollData.status);
+      const pollRes = await fetch(
+        `https://api.assemblyai.com/v2/transcript/${jobId}`,
+        { headers: { "Authorization": apiKey } }
+      );
 
-      if (pollData.status === "completed") {
-        text = pollData.text;
-        console.log("✅ Transcription completed");
-        break;
-      } else if (pollData.status === "error") {
-        console.error("❌ AssemblyAI reported error:", pollData.error);
-        throw new Error(pollData.error);
+      const pollText = await pollRes.text();
+      const pollData = JSON.parse(pollText);
+
+      if (pollData.status === "completed") return pollData.text;
+      if (pollData.status === "error") {
+        const friendly = makeFriendlyError("AssemblyAI", pollData.error || "");
+        throw new Error(friendly);
       }
     }
 
-    if (!text) {
-      throw new Error("Transcription timeout or empty result");
-    }
-
-    return text;
-  } catch (err) {
-    console.error("❌ AssemblyAI transcription error:", err);
-    return ""; // Return empty so plugin shows "failed"
+    throw new Error("AssemblyAI timeout: transcription took too long.");
+  } catch (err: any) {
+    console.error("❌ AssemblyAI transcription failed:", err);
+    throw new Error(err.message || "AssemblyAI transcription error");
   }
 }
