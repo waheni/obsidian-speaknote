@@ -168,7 +168,12 @@ async saveRecording(blob: Blob) {
           if (text) {
             const transcriptPath = filename.replace(".webm", ".md");
             await this.app.vault.create(transcriptPath, text);
-            new Notice(`✅ Transcript saved as: ${transcriptPath}`);
+              // ⭐ Open the new note automatically
+           const newNote = this.app.vault.getAbstractFileByPath(transcriptPath);
+          if (newNote) {
+                const leaf = this.app.workspace.getLeaf(true); // always create new leaf
+                await leaf.openFile(newNote);     }
+                new Notice(`✅ Transcript saved as: ${transcriptPath}`);
           } else {
             new Notice("⚠️ Transcription failed or empty.");
           }
