@@ -1,9 +1,10 @@
 {
   "id": "speaknote",
   "name": "SpeakNote",
-  "version": "0.0.1",
-  "minAppVersion": "1.0.0",
-  "description": "🎙️ Record and save voice notes directly inside Obsidian",
-  "author": "Wael Heni",
-  "isDesktopOnly": true
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Record voice notes in Obsidian and auto-transcribe them to markdown using Deepgram, AssemblyAI, or OpenAI Whisper.",
+  "author": "Neurahex (Heni Wael)",
+  "authorUrl": "https://neurahex.com",
+  "isDesktopOnly": false
 }
