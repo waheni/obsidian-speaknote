@@ -30,18 +30,6 @@ async function ensureFolder(app, path) {
   const folder = app.vault.getAbstractFileByPath(path);
   if (!folder) await app.vault.createFolder(path);
 }
-async function saveBinary(app, path, data) {
-  try {
-    return await app.vault.createBinary(path, data);
-  } catch (err) {
-    if (err.message.includes("already exists")) {
-      const [name, ext] = path.split(".");
-      const alt = `${name}_${Math.floor(Math.random() * 1e3)}.${ext}`;
-      return await app.vault.createBinary(alt, data);
-    }
-    throw err;
-  }
-}
 
 // src/settings.ts
 var import_obsidian = require("obsidian");
@@ -107,117 +95,160 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
 };
 
 // src/transcribe.ts
-async function transcribeAudio(apiKey, blob) {
-  const formData = new FormData();
-  formData.append("file", blob, "audio.webm");
-  formData.append("model", "whisper-1");
-  console.log("\u{1F9E0} Using provider:", this.settings.provider);
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: formData
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Transcription failed: ${errorText}`);
+function makeFriendlyError(provider, raw) {
+  raw = raw.toLowerCase();
+  if (raw.includes("invalid api key") || raw.includes("invalid credentials") || raw.includes("unauthorized")) {
+    return `${provider}: Invalid API Key. Please check your key.`;
   }
-  const data = await response.json();
-  if (!data.text) throw new Error("Empty transcription result");
-  return data.text;
+  if (raw.includes("quota") || raw.includes("limit")) {
+    return `${provider}: You exceeded your quota.`;
+  }
+  if (raw.includes("missing") || raw.includes("no api key")) {
+    return `${provider}: API key is missing.`;
+  }
+  if (raw.includes("forbidden")) {
+    return `${provider}: Access forbidden (possible wrong project / plan).`;
+  }
+  return `${provider}: ${raw}`;
+}
+async function transcribeAudio(apiKey, blob) {
+  try {
+    if (!apiKey) throw new Error("Missing API key");
+    const formData = new FormData();
+    formData.append("file", blob, "audio.webm");
+    formData.append("model", "whisper-1");
+    console.log("\u{1F3AC} Starting OpenAI transcription...");
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: formData
+    });
+    const raw = await response.text();
+    if (!response.ok) {
+      const friendly = makeFriendlyError("OpenAI", raw);
+      throw new Error(friendly);
+    }
+    const data = JSON.parse(raw);
+    if (!data.text) throw new Error("OpenAI returned empty text.");
+    return data.text;
+  } catch (err) {
+    console.error("\u274C OpenAI transcription failed:", err);
+    throw new Error(err.message || "OpenAI transcription error");
+  }
 }
 async function transcribeWithDeepgram(apiKey, blob) {
   try {
-    console.log("\u{1F3AC} Starting DeepGram transcription...");
+    if (!apiKey) throw new Error("Missing API key");
+    console.log("\u{1F3AC} Starting Deepgram transcription...");
     const arrayBuffer = await blob.arrayBuffer();
-    const response = await fetch("https://api.deepgram.com/v1/listen?model=nova-3", {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${apiKey}`
-      },
-      body: arrayBuffer
-    });
+    const response = await fetch(
+      "https://api.deepgram.com/v1/listen?model=nova-3",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${apiKey}`
+        },
+        body: arrayBuffer
+      }
+    );
+    const raw = await response.text();
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Deepgram error: ${errorText}`);
+      const friendly = makeFriendlyError("Deepgram", raw);
+      throw new Error(friendly);
     }
-    const data = await response.json();
+    const data = JSON.parse(raw);
     const transcript = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim();
-    if (!transcript) throw new Error("No transcript returned by Deepgram");
-    console.log("\u2705 Deepgram transcript:", transcript);
+    if (!transcript) throw new Error("Deepgram returned empty transcript.");
     return transcript;
   } catch (err) {
     console.error("\u274C Deepgram transcription failed:", err);
-    throw err;
+    throw new Error(err.message || "Deepgram transcription error");
   }
 }
 async function transcribeWithAssemblyAI(apiKey, blob) {
-  console.log("\u{1F3AC} Starting AssemblyAI transcription...");
   try {
-    console.log("\u{1F4E4} Uploading audio blob to AssemblyAI...");
+    if (!apiKey) throw new Error("Missing API key");
+    console.log("\u{1F3AC} Starting AssemblyAI transcription...");
     const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
       method: "POST",
       headers: { "Authorization": apiKey },
       body: blob
     });
+    const uploadRaw = await uploadRes.text();
     if (!uploadRes.ok) {
-      console.error("\u274C Upload failed:", uploadRes.status, await uploadRes.text());
-      throw new Error("Upload failed");
+      const friendly = makeFriendlyError("AssemblyAI", uploadRaw);
+      throw new Error(friendly);
     }
-    const uploadData = await uploadRes.json();
+    const uploadData = JSON.parse(uploadRaw);
     const audioUrl = uploadData.upload_url;
-    console.log("\u2705 Uploaded successfully to:", audioUrl);
-    const requestBody = {
+    const body = {
       audio_url: audioUrl,
-      // ⚠️ must be snake_case
       language_code: "en",
-      // or "en", "fr", "ar"
       auto_chapters: false
     };
-    console.log("\u{1F4E4} Sending transcription request:", requestBody);
-    const transcriptRes = await fetch("https://api.assemblyai.com/v2/transcript", {
+    const jobRes = await fetch("https://api.assemblyai.com/v2/transcript", {
       method: "POST",
       headers: {
         "Authorization": apiKey,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(body)
     });
-    const rawResponse = await transcriptRes.text();
-    console.log("\u{1F4E5} Raw response from AssemblyAI:", transcriptRes.status, rawResponse);
-    if (!transcriptRes.ok) {
-      throw new Error(`\u274C Failed to start transcription job: ${rawResponse}`);
+    const rawJob = await jobRes.text();
+    if (!jobRes.ok) {
+      const friendly = makeFriendlyError("AssemblyAI", rawJob);
+      throw new Error(friendly);
     }
-    const transcriptData = JSON.parse(rawResponse);
-    const transcriptId = transcriptData.id;
-    console.log("\u{1F9E0} Transcription job started:", transcriptId);
-    let text = "";
+    const jobData = JSON.parse(rawJob);
+    const jobId = jobData.id;
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 2e3));
-      const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
-        headers: { "Authorization": apiKey }
-      });
-      const pollData = await pollRes.json();
-      console.log(`\u23F3 Polling attempt ${i + 1}:`, pollData.status);
-      if (pollData.status === "completed") {
-        text = pollData.text;
-        console.log("\u2705 Transcription completed");
-        break;
-      } else if (pollData.status === "error") {
-        console.error("\u274C AssemblyAI reported error:", pollData.error);
-        throw new Error(pollData.error);
+      const pollRes = await fetch(
+        `https://api.assemblyai.com/v2/transcript/${jobId}`,
+        { headers: { "Authorization": apiKey } }
+      );
+      const pollText = await pollRes.text();
+      const pollData = JSON.parse(pollText);
+      if (pollData.status === "completed") return pollData.text;
+      if (pollData.status === "error") {
+        const friendly = makeFriendlyError("AssemblyAI", pollData.error || "");
+        throw new Error(friendly);
       }
     }
-    if (!text) {
-      throw new Error("Transcription timeout or empty result");
-    }
-    return text;
+    throw new Error("AssemblyAI timeout: transcription took too long.");
   } catch (err) {
-    console.error("\u274C AssemblyAI transcription error:", err);
-    return "";
+    console.error("\u274C AssemblyAI transcription failed:", err);
+    throw new Error(err.message || "AssemblyAI transcription error");
   }
 }
 
 // src/main.ts
+async function safeCreateBinary(app, path, data) {
+  try {
+    return await app.vault.createBinary(path, data);
+  } catch (err) {
+    if (err?.message?.includes("exists")) {
+      const ext = path.split(".").pop();
+      const base = path.replace(`.${ext}`, "");
+      const fallback = `${base}_${Date.now()}.${ext}`;
+      return await app.vault.createBinary(fallback, data);
+    }
+    throw err;
+  }
+}
+async function safeCreateFile(app, path, content) {
+  try {
+    return await app.vault.create(path, content);
+  } catch (err) {
+    if (err?.message?.includes("exists")) {
+      const ext = path.split(".").pop();
+      const base = path.replace(`.${ext}`, "");
+      const fallback = `${base}_${Date.now()}.${ext}`;
+      return await app.vault.create(fallback, content);
+    }
+    throw err;
+  }
+}
 var SpeakNotePlugin = class extends import_obsidian2.Plugin {
   constructor() {
     super(...arguments);
@@ -279,8 +310,18 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
       this.ribbonIconEl?.classList.add("recording");
       new import_obsidian2.Notice("\u{1F3A4} Recording started...");
     } catch (err) {
-      console.error(err);
-      new import_obsidian2.Notice("\u274C Microphone access denied or unavailable.");
+      console.error("Microphone error:", err);
+      if (err.name === "NotAllowedError") {
+        new import_obsidian2.Notice("\u274C Microphone permission denied.\nEnable the mic in your system settings.");
+      } else if (err.name === "NotFoundError") {
+        new import_obsidian2.Notice("\u274C No microphone detected.\nPlease connect a microphone.");
+      } else if (err.name === "AbortError") {
+        new import_obsidian2.Notice("\u274C Browser blocked microphone access.");
+      } else if (err.name === "NotReadableError") {
+        new import_obsidian2.Notice("\u274C Microphone is busy.\nClose other apps using the mic.");
+      } else {
+        new import_obsidian2.Notice("\u274C Could not start recording.\nUnknown error occurred.");
+      }
     }
   }
   async toggleRecording() {
@@ -322,41 +363,68 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
     }
   }
   async saveRecording(blob) {
+    let filename = "";
     try {
-      const folderPath = "SpeakNotes";
+      const folderPath = this.settings.defaultFolder || "SpeakNotes";
       await ensureFolder(this.app, folderPath);
       const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
-      const filename = `${folderPath}/${timestamp}.webm`;
+      filename = `${folderPath}/${timestamp}.webm`;
       const buffer = new Uint8Array(await blob.arrayBuffer());
-      const newFile = await saveBinary(this.app, filename, buffer);
+      const newFile = await safeCreateBinary(this.app, filename, buffer);
       this.lastSavedFile = newFile;
-      new import_obsidian2.Notice(`\u2705 Saved: ${filename}`);
-      console.log("\u2705 File saved:", filename);
+      new import_obsidian2.Notice(`\u2705 Saved: ${newFile.path}`);
+      console.log("\u2705 Audio file saved:", newFile.path);
       if (this.settings.autoTranscribe) {
-        new import_obsidian2.Notice("\u{1F9E0} Transcribing your recording...");
+        this.showOverlay("\u{1F9E0} Transcribing your recording...");
+        const start = Date.now();
         let text = "";
-        if (this.settings.provider === "Deepgram" && this.settings.deepgramApiKey) {
+        if (this.settings.provider === "Deepgram") {
+          if (!this.settings.deepgramApiKey)
+            throw new Error("Missing Deepgram API key");
           text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob);
-        } else if (this.settings.provider === "AssemblyAI" && this.settings.assemblyApiKey) {
+        } else if (this.settings.provider === "AssemblyAI") {
+          if (!this.settings.assemblyApiKey)
+            throw new Error("Missing AssemblyAI API key");
           text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob);
-        } else if (this.settings.provider === "OpenAI" && this.settings.openaiApiKey) {
+        } else if (this.settings.provider === "OpenAI") {
+          if (!this.settings.openaiApiKey)
+            throw new Error("Missing OpenAI API key");
           text = await transcribeAudio(this.settings.openaiApiKey, blob);
-        } else {
-          console.log(`\u274C Error`);
         }
+        const elapsed = Date.now() - start;
+        if (elapsed < 500) await new Promise((r) => setTimeout(r, 500 - elapsed));
+        this.hideOverlay();
         if (text) {
           const transcriptPath = filename.replace(".webm", ".md");
-          await this.app.vault.create(transcriptPath, text);
-          new import_obsidian2.Notice(`\u2705 Transcript saved as: ${transcriptPath}`);
+          const transcriptFile = await safeCreateFile(this.app, transcriptPath, text);
+          const leaf = this.app.workspace.getLeaf(true);
+          await leaf.openFile(transcriptFile);
+          new import_obsidian2.Notice(`\u{1F4C4} Transcript saved: ${transcriptFile.path}`);
         } else {
-          new import_obsidian2.Notice("\u26A0\uFE0F Transcription failed or empty.");
+          new import_obsidian2.Notice("\u26A0\uFE0F Empty transcription result.");
         }
       }
-    } catch (err) {
-      console.error("Save error:", err);
-      new import_obsidian2.Notice("\u274C Failed to save recording.");
+    } catch (apiError) {
+      this.hideOverlay();
+      console.error("\u274C API Error:", apiError);
+      const raw = apiError?.message || apiError?.toString() || "";
+      const msg = raw.toLowerCase();
+      if (msg.includes("missing")) {
+        new import_obsidian2.Notice("\u274C No API key provided.\nEnter it in Settings \u2192 SpeakNote.");
+      } else if (msg.includes("invalid") || msg.includes("401") || msg.includes("invalid_auth") || msg.includes("invalid_api_key") || msg.includes("incorrect api key")) {
+        new import_obsidian2.Notice("\u274C Invalid API key.\nPlease verify your key in Settings.");
+      } else if (msg.includes("quota") || msg.includes("limit") || msg.includes("insufficient_quota")) {
+        new import_obsidian2.Notice("\u26A0\uFE0F API quota exceeded.\nUpgrade your plan or wait for reset.");
+      } else if (msg.includes("language")) {
+        new import_obsidian2.Notice("\u26A0\uFE0F Language not supported.");
+      } else if (msg.includes("network") || msg.includes("failed to fetch")) {
+        new import_obsidian2.Notice("\u{1F310} Network error.\nPlease check your internet connection.");
+      } else {
+        new import_obsidian2.Notice("\u274C Transcription failed.\n(See console for details)");
+      }
     }
   }
+  // end function
   async playRecording(file) {
     try {
       const data = await this.app.vault.readBinary(file);
@@ -405,5 +473,20 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
       }, 5e3);
     });
     return container;
+  }
+  showOverlay(message) {
+    this.hideOverlay();
+    const overlay = document.createElement("div");
+    overlay.className = "speaknote-overlay";
+    const spinner = document.createElement("div");
+    spinner.className = "speaknote-spinner";
+    const text = document.createElement("div");
+    text.textContent = message;
+    overlay.appendChild(spinner);
+    overlay.appendChild(text);
+    document.body.appendChild(overlay);
+  }
+  hideOverlay() {
+    document.querySelector(".speaknote-overlay")?.remove();
   }
 };
