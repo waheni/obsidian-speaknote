@@ -3,6 +3,43 @@ import { ensureFolder, saveBinary } from "./vaultUtils";
 import { SpeakNoteSettingTab, DEFAULT_SETTINGS, SpeakNoteSettings } from "./settings";
 import { transcribeAudio , transcribeWithDeepgram , transcribeWithAssemblyAI} from "./transcribe";
 
+
+
+
+/**
+ * Safely create a binary file — avoids duplicate filename errors
+ */
+async function safeCreateBinary(app: App, path: string, data: Uint8Array): Promise<TFile> {
+  try {
+    return await app.vault.createBinary(path, data);
+  } catch (err: any) {
+    if (err?.message?.includes("exists")) {
+      const ext = path.split(".").pop();
+      const base = path.replace(`.${ext}`, "");
+      const fallback = `${base}_${Date.now()}.${ext}`;
+      return await app.vault.createBinary(fallback, data);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Safely create a text file (for transcripts)
+ */
+async function safeCreateFile(app: App, path: string, content: string): Promise<TFile> {
+  try {
+    return await app.vault.create(path, content);
+  } catch (err: any) {
+    if (err?.message?.includes("exists")) {
+      const ext = path.split(".").pop();
+      const base = path.replace(`.${ext}`, "");
+      const fallback = `${base}_${Date.now()}.${ext}`;
+      return await app.vault.create(fallback, content);
+    }
+    throw err;
+  }
+}
+
 export default class SpeakNotePlugin extends Plugin {
   private mediaRecorder: MediaRecorder | null = null;
   private chunks: BlobPart[] = [];
@@ -138,94 +175,127 @@ stopRecording() {
   }
 }
 
+
+
+
 async saveRecording(blob: Blob) {
+  let filename = "";
   try {
-    const folderPath = "SpeakNotes";
+    const folderPath = this.settings.defaultFolder || "SpeakNotes";
     await ensureFolder(this.app, folderPath);
 
     const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
-    const filename = `${folderPath}/${timestamp}.webm`;
+    filename = `${folderPath}/${timestamp}.webm`;
 
     const buffer = new Uint8Array(await blob.arrayBuffer());
-    const newFile = await saveBinary(this.app, filename, buffer);
+
+    // ⭐ Safe file creation — prevents collisions
+    const newFile = await safeCreateBinary(this.app, filename, buffer);
     this.lastSavedFile = newFile;
 
-    new Notice(`✅ Saved: ${filename}`);
-    console.log("✅ File saved:", filename);
+    new Notice(`✅ Saved: ${newFile.path}`);
+    console.log("✅ Audio file saved:", newFile.path);
 
-          // 🔹 Optional: Auto-transcribe after saving
-        if (this.settings.autoTranscribe) {
-          const start = Date.now();
-          this.showOverlay("🧠 Transcribing your recording...");
-          let text = "";
+    // ───────────────────────────────────────────────
+    // 🔹 Auto-transcription (if enabled)
+    // ───────────────────────────────────────────────
+    if (this.settings.autoTranscribe) {
 
-          if (this.settings.provider === "Deepgram" ) {
-                if (!this.settings.deepgramApiKey) {
-                     throw new Error("Missing Deepgram API key");
-                } 
-                text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob);
-          } 
-          else if (this.settings.provider === "AssemblyAI" ) {
+      this.showOverlay("🧠 Transcribing your recording...");
+      const start = Date.now();
+      let text = "";
 
-                    if (!this.settings.assemblyApiKey) {
-                      throw new Error("Missing AssemblyAI API key");
-                    }
-                  text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob);
-          } 
-          else if (this.settings.provider === "OpenAI" ) {
-                  if (!this.settings.openaiApiKey) {
-                      throw new Error("Missing OpenAI API key");
-                    }
-            text = await transcribeAudio(this.settings.openaiApiKey, blob);
-          }
+      // ---------------------------
+      // 🔸 Provider: Deepgram
+      // ---------------------------
+      if (this.settings.provider === "Deepgram") {
+        if (!this.settings.deepgramApiKey)
+          throw new Error("Missing Deepgram API key");
 
-          const elapsed = Date.now() - start;
-          if (elapsed < 500) {
-            await new Promise(r => setTimeout(r, 500 - elapsed));
-          }
-        this.hideOverlay();
-          if (text) {
-            const transcriptPath = filename.replace(".webm", ".md");
-            await this.app.vault.create(transcriptPath, text);
-              // ⭐ Open the new note automatically
-           const newNote = this.app.vault.getAbstractFileByPath(transcriptPath);
-          if (newNote) {
-                const leaf = this.app.workspace.getLeaf(true); // always create new leaf
-                await leaf.openFile(newNote);     }
-                new Notice(`✅ Transcript saved as: ${transcriptPath}`);
-          } else {
-            new Notice("⚠️ Transcription failed or empty.");
-          }
-        }
+        text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob);
+      }
+
+      // ---------------------------
+      // 🔸 Provider: AssemblyAI
+      // ---------------------------
+      else if (this.settings.provider === "AssemblyAI") {
+        if (!this.settings.assemblyApiKey)
+          throw new Error("Missing AssemblyAI API key");
+
+        text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob);
+      }
+
+      // ---------------------------
+      // 🔸 Provider: OpenAI Whisper
+      // ---------------------------
+      else if (this.settings.provider === "OpenAI") {
+        if (!this.settings.openaiApiKey)
+          throw new Error("Missing OpenAI API key");
+
+        text = await transcribeAudio(this.settings.openaiApiKey, blob);
+      }
+
+      // Minimum spinner time (clean UX)
+      const elapsed = Date.now() - start;
+      if (elapsed < 500) await new Promise(r => setTimeout(r, 500 - elapsed));
+
+      this.hideOverlay();
+
+      // ⭐ Save transcript
+      if (text) {
+        const transcriptPath = filename.replace(".webm", ".md");
+        const transcriptFile = await safeCreateFile(this.app, transcriptPath, text);
+
+        // Auto-open new note
+        const leaf = this.app.workspace.getLeaf(true);
+        await leaf.openFile(transcriptFile);
+
+        new Notice(`📄 Transcript saved: ${transcriptFile.path}`);
+      } else {
+        new Notice("⚠️ Empty transcription result.");
+      }
+    }
+
   } catch (apiError: any) {
-  this.hideOverlay();
-  console.error("API Error:", apiError);
 
-  const msg = apiError.message || "";
+    this.hideOverlay();
+    console.error("❌ API Error:", apiError);
 
-  if (msg.includes("Missing")) {
-    new Notice("❌ No API key provided.\nPlease enter your API key in Settings → SpeakNote.");
-  }
-  else if (msg.includes("Invalid") || msg.includes("401") ||   msg.includes("invalid_auth") || msg.includes("invalid_api_key") || msg.includes("incorrect api key")) 
-  {
-    new Notice("❌ Invalid API key.\nPlease verify your key in Settings.");
-  }
-  else if (msg.includes("quota") || msg.includes("limit")) {
-    new Notice("⚠️ API quota exceeded.\nUpgrade your plan or wait for reset.");
-  }
-  else if (msg.includes("language")) {
-    new Notice("⚠️ Selected language not supported by this provider.");
-  }
-  else if (msg.includes("network") || msg.includes("Failed to fetch")) {
-    new Notice("🌐 Network error.\nPlease check your internet connection.");
-  }
-  else {
-    new Notice("❌ Transcription failed.\n(See console for details)");
-  }
+    const raw = apiError?.message || apiError?.toString() || "";
+    const msg = raw.toLowerCase();
 
-  return;
-}
-}
+    // ────────────────
+    // Error categories
+    // ────────────────
+
+    if (msg.includes("missing")) {
+      new Notice("❌ No API key provided.\nEnter it in Settings → SpeakNote.");
+    }
+    else if (
+      msg.includes("invalid") ||
+      msg.includes("401") ||
+      msg.includes("invalid_auth") ||
+      msg.includes("invalid_api_key") ||
+      msg.includes("incorrect api key")
+    ) {
+      new Notice("❌ Invalid API key.\nPlease verify your key in Settings.");
+    }
+    else if (msg.includes("quota") || msg.includes("limit") || msg.includes("insufficient_quota")) {
+      new Notice("⚠️ API quota exceeded.\nUpgrade your plan or wait for reset.");
+    }
+    else if (msg.includes("language")) {
+      new Notice("⚠️ Language not supported.");
+    }
+    else if (msg.includes("network") || msg.includes("failed to fetch")) {
+      new Notice("🌐 Network error.\nPlease check your internet connection.");
+    }
+    else {
+      new Notice("❌ Transcription failed.\n(See console for details)");
+    }
+
+  } // end catch
+} // end function
+
 
   async playRecording(file: TFile) {
   try {
@@ -251,6 +321,8 @@ async saveRecording(blob: Blob) {
     new Notice("❌ Unable to play audio file.");
   }
   }
+ 
+
 showFloatingPlayer(url: string) {
   console.log("📢 showFloatingPlayer CALLED:", url);
 
@@ -317,5 +389,7 @@ showOverlay(message: string) {
 hideOverlay() {
   document.querySelector(".speaknote-overlay")?.remove();
 }
+
+
 
 }
