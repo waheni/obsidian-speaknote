@@ -144,7 +144,8 @@ async saveRecording(blob: Blob) {
 
           // 🔹 Optional: Auto-transcribe after saving
         if (this.settings.autoTranscribe) {
-          new Notice("🧠 Transcribing your recording...");
+          const start = Date.now();
+          this.showOverlay("🧠 Transcribing your recording...");
           let text = "";
 
           if (this.settings.provider === "Deepgram" && this.settings.deepgramApiKey) {
@@ -159,7 +160,11 @@ async saveRecording(blob: Blob) {
           else{
                         console.log(`❌ Error`);
           }
-
+          const elapsed = Date.now() - start;
+          if (elapsed < 500) {
+            await new Promise(r => setTimeout(r, 500 - elapsed));
+          }
+        this.hideOverlay();
           if (text) {
             const transcriptPath = filename.replace(".webm", ".md");
             await this.app.vault.create(transcriptPath, text);
@@ -243,4 +248,26 @@ showFloatingPlayer(url: string) {
 
   return container;
 }
+
+showOverlay(message: string) {
+  this.hideOverlay(); // clear any existing one
+
+  const overlay = document.createElement("div");
+  overlay.className = "speaknote-overlay";
+
+  const spinner = document.createElement("div");
+  spinner.className = "speaknote-spinner";
+
+  const text = document.createElement("div");
+  text.textContent = message;
+
+  overlay.appendChild(spinner);
+  overlay.appendChild(text);
+  document.body.appendChild(overlay);
+}
+
+hideOverlay() {
+  document.querySelector(".speaknote-overlay")?.remove();
+}
+
 }
