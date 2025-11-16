@@ -123,5 +123,20 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+      // -----------------------------
+// Feedback link
+// -----------------------------
+new Setting(containerEl)
+  .setName("Feedback & Support")
+  .setDesc("Report bugs or request features on GitHub")
+  .addButton(btn =>
+    btn
+      .setButtonText("Open Feedback Page")
+      .setCta()
+      .onClick(() => {
+        window.open("https://github.com/waheni/obsidian-speaknote/issues", "_blank");
+      })
+  );
   }
 }
