@@ -105,8 +105,8 @@ Fast. Simple. Private.
 
 Please share bugs, suggestions, and ideas:
 
-👉 GitHub issues: *(link to repository)*  
-👉 Email: *your‑email@example.com*
+👉 GitHub issues: *https://github.com/waheni/obsidian-speaknote/issues*  
+👉 Email: *support@neurahex.com*
 
 ---
 
@@ -115,3 +115,4 @@ Please share bugs, suggestions, and ideas:
 Released under the **MIT License**. Free for personal & commercial use.
 
 Enjoy fast voice capture inside Obsidian! 🚀
+
