@@ -106,7 +106,7 @@ Fast. Simple. Private.
 Please share bugs, suggestions, and ideas:
 
 👉 GitHub issues: *https://github.com/waheni/obsidian-speaknote/issues*  
-👉 Email: *support@neurahex.com*
+👉 Email: *waelheni@neurahex.com*
 
 ---
 
