@@ -48,7 +48,9 @@ export default class SpeakNotePlugin extends Plugin {
   private ribbonIconEl: HTMLElement | null = null;
   settings: SpeakNoteSettings;
   private isBusy = false;
-
+// --- Recording limitation state ---
+  private recordingTimeout: number | null = null;
+  private isAutoStopped: boolean = false;
 
   async onload() {
     console.log("✅ SpeakNote plugin loaded");
@@ -110,8 +112,26 @@ export default class SpeakNotePlugin extends Plugin {
 
     this.mediaRecorder.start();
     this.isRecording = true;
+    this.isAutoStopped = false;                 
+
     this.ribbonIconEl?.classList.add("recording");
     new Notice("🎤 Recording started...");
+    // ----------------------------------------------------
+    // ⭐ NEW V.0.2.0 — Enforce free recording limit (1 minute)
+    // ----------------------------------------------------
+    const maxSeconds = this.settings.maxRecordingSecondsFree ?? 60;
+    const maxMs = maxSeconds * 1000;
+    
+    if (this.recordingTimeout) {
+      window.clearTimeout(this.recordingTimeout);
+    }
+
+    this.recordingTimeout = window.setTimeout(() => {
+      console.log("⏳ SpeakNote limit reached, auto-stopping...");
+      this.isAutoStopped = true;
+      this.stopRecording();
+    }, maxMs);
+    // ----------------------------------------------------
   } catch (err) {
     console.error("Microphone error:", err);
 
@@ -154,6 +174,13 @@ export default class SpeakNotePlugin extends Plugin {
   }
 
 stopRecording() {
+  
+  // NEW v.0.2.0 — Clear timeout
+  if (this.recordingTimeout) {
+      window.clearTimeout(this.recordingTimeout);
+      this.recordingTimeout = null;
+    }
+
   if (this.mediaRecorder && this.isRecording) {
     try {
       this.mediaRecorder.stop();
@@ -166,7 +193,12 @@ stopRecording() {
 
       // 🟥 Update ribbon icon + user feedback
       this.ribbonIconEl?.classList.remove("recording");
-      new Notice("💾 Recording stopped, saving file...");
+      // NEW v0.2.0— Show upgrade message if limit reached
+      if (this.isAutoStopped) {
+        this.showUpgradeMessage();
+      } else {
+        new Notice("💾 Recording stopped, saving file...");
+      }
       console.log("🛑 Recording stopped and stream released");
     } catch (err) {
       console.error("❌ Error while stopping recording:", err);
@@ -390,6 +422,17 @@ hideOverlay() {
   document.querySelector(".speaknote-overlay")?.remove();
 }
 
+private showUpgradeMessage() {
+  const el = document.createElement("div");
+  el.className = "speaknote-upgrade-toast";
+  el.textContent = "⏳ Free limit reached — unlock 5-minute recordings in Early Access";
 
+  document.body.appendChild(el);
+
+  setTimeout(() => {
+    el.style.opacity = "0";
+    setTimeout(() => el.remove(), 500);
+  }, 8000); // stays 8s
+}
 
 }
