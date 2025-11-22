@@ -132,21 +132,46 @@ export default class SpeakNotePlugin extends Plugin {
       this.stopRecording();
     }, maxMs);
     // ----------------------------------------------------
-  } catch (err) {
-    console.error("Microphone error:", err);
+  } catch (err: any) {
+  console.error("🎤 Microphone error:", err);
 
-    if (err.name === "NotAllowedError") {
-      new Notice("❌ Microphone permission denied.\nEnable the mic in your system settings.");
-    } else if (err.name === "NotFoundError") {
-      new Notice("❌ No microphone detected.\nPlease connect a microphone.");
-    } else if (err.name === "AbortError") {
-      new Notice("❌ Browser blocked microphone access.");
-    } else if (err.name === "NotReadableError") {
-      new Notice("❌ Microphone is busy.\nClose other apps using the mic.");
-    } else {
-      new Notice("❌ Could not start recording.\nUnknown error occurred.");
-    }
+  if (err.name === "NotAllowedError") {
+    new Notice(
+      "🔒 Microphone blocked.\n" +
+      "Enable access in your system or browser permissions and try again."
+    );
   }
+  else if (err.name === "NotFoundError") {
+    new Notice(
+      "🎤 No microphone detected.\n" +
+      "Connect a microphone and try again."
+    );
+  }
+  else if (err.name === "NotReadableError") {
+    new Notice(
+      "🎙️ Microphone is in use by another app.\n" +
+      "Close other recording apps and retry."
+    );
+  }
+  else if (err.name === "AbortError") {
+    new Notice(
+      "⚠️ Recording was interrupted.\n" +
+      "Please try again."
+    );
+  }
+  else if (err.name === "SecurityError") {
+    new Notice(
+      "🔐 Microphone access blocked by your browser.\n" +
+      "Check site permissions and try again."
+    );
+  }
+  else {
+    new Notice(
+      "⚠️ Could not start recording.\n" +
+      "See console (Ctrl+Shift+I) for technical details."
+    );
+  }
+}
   }
   async toggleRecording() {
   // 🧱 Prevent spamming clicks
@@ -289,43 +314,92 @@ async saveRecording(blob: Blob) {
     }
 
   } catch (apiError: any) {
+  this.hideOverlay();
+  console.error("❌ API Error:", apiError);
 
-    this.hideOverlay();
-    console.error("❌ API Error:", apiError);
+  const msg = (apiError?.message || "").toLowerCase();
 
-    const raw = apiError?.message || apiError?.toString() || "";
-    const msg = raw.toLowerCase();
+  // ----- Missing or invalid API key -----
+  if (msg.includes("missing") || msg.includes("no api key")) {
+    new Notice(
+      "🔑 Missing API key.\n" +
+      "Add your provider key in Settings → SpeakNote.",
+      7000
+    );
+  }
 
-    // ────────────────
-    // Error categories
-    // ────────────────
+  else if (
+    msg.includes("invalid") ||
+    msg.includes("unauthorized") ||
+    msg.includes("incorrect api key") ||
+    msg.includes("401")
+  ) {
+    new Notice(
+      "❌ Invalid API key.\n" +
+      "Please double-check your key in Settings.",
+      7000
+    );
+  }
 
-    if (msg.includes("missing")) {
-      new Notice("❌ No API key provided.\nEnter it in Settings → SpeakNote.");
-    }
-    else if (
-      msg.includes("invalid") ||
-      msg.includes("401") ||
-      msg.includes("invalid_auth") ||
-      msg.includes("invalid_api_key") ||
-      msg.includes("incorrect api key")
-    ) {
-      new Notice("❌ Invalid API key.\nPlease verify your key in Settings.");
-    }
-    else if (msg.includes("quota") || msg.includes("limit") || msg.includes("insufficient_quota")) {
-      new Notice("⚠️ API quota exceeded.\nUpgrade your plan or wait for reset.");
-    }
-    else if (msg.includes("language")) {
-      new Notice("⚠️ Language not supported.");
-    }
-    else if (msg.includes("network") || msg.includes("failed to fetch")) {
-      new Notice("🌐 Network error.\nPlease check your internet connection.");
-    }
-    else {
-      new Notice("❌ Transcription failed.\n(See console for details)");
-    }
+  // ----- Quota or plan limits -----
+  else if (
+    msg.includes("quota") ||
+    msg.includes("limit") ||
+    msg.includes("insufficient_quota")
+  ) {
+    new Notice(
+      "⚠️ API quota exceeded.\n" +
+      "Your provider usage limit has been reached.",
+      7000
+    );
+  }
 
-  } // end catch
+  // ----- Language unsupported -----
+  else if (msg.includes("language")) {
+    new Notice(
+      "🌐 Language not supported by this provider.\n" +
+      "Try English, French, Spanish, or German.",
+      7000
+    );
+  }
+
+  // ----- Network issues -----
+  else if (
+    msg.includes("network") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("timeout") ||
+    msg.includes("connection")
+  ) {
+    new Notice(
+      "🌐 Network issue.\n" +
+      "Please check your internet connection and try again.",
+      7000
+    );
+  }
+
+  // ----- Empty or bad response -----
+  else if (
+    msg.includes("empty") ||
+    msg.includes("no text") ||
+    msg.includes("null")
+  ) {
+    new Notice(
+      "⚠️ Transcription returned no text.\n" +
+      "Try again or use a different provider.",
+      7000
+    );
+  }
+
+  // ----- Generic fallback -----
+  else {
+    new Notice(
+      "⚠️ Transcription failed.\n" +
+      "See console (Ctrl+Shift+I) for details.",
+      7000
+    );
+  }
+}
+
 } // end function
 
 

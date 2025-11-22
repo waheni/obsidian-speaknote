@@ -12,25 +12,58 @@ export function mapLanguage(lang: string): string {
 /**
  * Utility to normalize ANY provider error into a clear message.
  */
-function makeFriendlyError(provider: string, raw: string): string {
-  raw = raw.toLowerCase();
+export function makeFriendlyError(provider: string, raw: string): string {
+  const msg = raw.toLowerCase();
 
-  if (raw.includes("invalid api key") || raw.includes("invalid credentials") || raw.includes("unauthorized")) {
-    return `${provider}: Invalid API Key. Please check your key.`;
+  // ----- Missing or invalid API key -----
+  if (msg.includes("missing") || msg.includes("no api key")) {
+    return `${provider}: Missing API key.`;
   }
 
-  if (raw.includes("quota") || raw.includes("limit")) {
-    return `${provider}: You exceeded your quota.`;
+  if (
+    msg.includes("invalid api key") ||
+    msg.includes("invalid credentials") ||
+    msg.includes("unauthorized") ||
+    msg.includes("incorrect api key") ||
+    msg.includes("401")
+  ) {
+    return `${provider}: Invalid API key.`;
   }
 
-  if (raw.includes("missing") || raw.includes("no api key")) {
-    return `${provider}: API key is missing.`;
+  // ----- Quota or plan limits -----
+  if (
+    msg.includes("quota") ||
+    msg.includes("limit") ||
+    msg.includes("insufficient_quota")
+  ) {
+    return `${provider}: API quota exceeded.`;
   }
 
-  if (raw.includes("forbidden")) {
-    return `${provider}: Access forbidden (possible wrong project / plan).`;
+  // ----- Unsupported language -----
+  if (msg.includes("language") || msg.includes("unsupported")) {
+    return `${provider}: Language not supported.`;
   }
 
+  // ----- Forbidden / wrong project -----
+  if (msg.includes("forbidden") || msg.includes("403")) {
+    return `${provider}: Access forbidden (check account permissions).`;
+  }
+
+  // ----- Network issues -----
+  if (
+    msg.includes("network") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("timeout")
+  ) {
+    return `${provider}: Network connection issue.`;
+  }
+
+  // ----- Rate limits -----
+  if (msg.includes("too many") || msg.includes("429")) {
+    return `${provider}: Too many requests. Slow down and try again.`;
+  }
+
+  // ----- Fallback -----
   return `${provider}: ${raw}`;
 }
 
