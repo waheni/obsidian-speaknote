@@ -11,7 +11,7 @@ export interface SpeakNoteSettings {
   deepgramApiKey: string;
 
   // Language selection 
-  language: "en" | "fr" | "ar" | "es";
+  language: "en" | "fr" | "de" | "es";
   defaultFolder: string;
   autoTranscribe: boolean;
   // Free/premium logic
@@ -165,24 +165,16 @@ new Setting(containerEl)
     text.setDisabled(true);
   });
 
-  // -------------------------
+// -------------------------
 // Early Access (optional email)
 // -------------------------
-containerEl.createEl("h3", { text: "Early Access (Optional)" });
+containerEl.createEl("h3", { text: "Extended Recording" });
 
 new Setting(containerEl)
-  .setName("Join early access")
-  .setDesc("Unlock extended recording time (5 minutes) soon. You will be notified when available.")
-  .addText(text => {
-    text.setPlaceholder("your@email.com");
-    text.onChange(async (value) => {
-      console.log("Early access signup:", value);
-      // Store locally for now (later: send to backend)
-      // this.plugin.settings.earlyAccessEmail = value;
-      await this.plugin.saveSettings();
-    });
-  });
-
+  .setName("Coming soon")
+  .setDesc("Extended 5-minute recording will be available in v0.3.0. Sign-in required.")
+  .addText(txt => txt.setValue("Available in next version").setDisabled(true));
+  
 // -----------------------------
 // Feedback link
 // -----------------------------

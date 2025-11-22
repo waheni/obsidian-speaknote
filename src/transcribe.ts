@@ -3,7 +3,7 @@ export function mapLanguage(lang: string): string {
   // en, fr, ar, es
   switch (lang) {
     case "fr": return "fr";
-    case "ar": return "ar";
+    case "de": return "de";
     case "es": return "es";
     case "en":
     default:   return "en";
