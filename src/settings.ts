@@ -9,8 +9,15 @@ export interface SpeakNoteSettings {
   assemblyApiKey: string;
   openaiApiKey: string;
   deepgramApiKey: string;
+
+  // Language selection 
+  language: "en" | "fr" | "ar" | "es";
   defaultFolder: string;
   autoTranscribe: boolean;
+  // Free/premium logic
+  maxRecordingSecondsFree: number;     // 60 seconds
+  extendedRecordingEnabled: boolean;   // future unlock (email)
+  premiumUnlocked: boolean;            // future premium
 }
 
 export const DEFAULT_SETTINGS: SpeakNoteSettings = {
@@ -19,8 +26,13 @@ export const DEFAULT_SETTINGS: SpeakNoteSettings = {
   assemblyApiKey: "",
   openaiApiKey: "",
   deepgramApiKey: "",
+  language: "en",
+
   defaultFolder: "SpeakNotes",
-  autoTranscribe: false,
+  autoTranscribe: true,
+  maxRecordingSecondsFree: 60,        // 1-minute limit
+  extendedRecordingEnabled: false,    // will enable 5-min recording
+  premiumUnlocked: false              // will enable unlimited
 };
 
 export class SpeakNoteSettingTab extends PluginSettingTab {
@@ -98,6 +110,25 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
           })
       );
     }
+
+// -------------------------
+// Language selection
+// -------------------------
+new Setting(containerEl)
+  .setName("Language")
+  .setDesc("Language used for transcription.")
+  .addDropdown(drop => drop
+    .addOption("en", "English")
+    .addOption("fr", "French")
+    .addOption("ar", "Arabic")
+    .addOption("es", "Spanish")
+    .setValue(this.plugin.settings.language)
+    .onChange(async (value: string) => {
+      this.plugin.settings.language = value as any;
+      await this.plugin.saveSettings();
+    })
+  );
+
     // Default folder path
     new Setting(containerEl)
       .setName("Recordings folder")
@@ -123,8 +154,36 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+// -------------------------
+// Free recording limit
+// -------------------------
+new Setting(containerEl)
+  .setName("Free recording limit")
+  .setDesc("The free version limits recordings to 1 minute.")
+  .addText(text => {
+    text.setValue(this.plugin.settings.maxRecordingSecondsFree.toString());
+    text.setDisabled(true);
+  });
 
-      // -----------------------------
+  // -------------------------
+// Early Access (optional email)
+// -------------------------
+containerEl.createEl("h3", { text: "Early Access (Optional)" });
+
+new Setting(containerEl)
+  .setName("Join early access")
+  .setDesc("Unlock extended recording time (5 minutes) soon. You will be notified when available.")
+  .addText(text => {
+    text.setPlaceholder("your@email.com");
+    text.onChange(async (value) => {
+      console.log("Early access signup:", value);
+      // Store locally for now (later: send to backend)
+      // this.plugin.settings.earlyAccessEmail = value;
+      await this.plugin.saveSettings();
+    });
+  });
+
+// -----------------------------
 // Feedback link
 // -----------------------------
 new Setting(containerEl)
