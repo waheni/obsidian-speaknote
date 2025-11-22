@@ -1,3 +1,14 @@
+export function mapLanguage(lang: string): string {
+  // Whisper, Deepgram, and AssemblyAI mostly accept ISO codes:
+  // en, fr, ar, es
+  switch (lang) {
+    case "fr": return "fr";
+    case "ar": return "ar";
+    case "es": return "es";
+    case "en":
+    default:   return "en";
+  }
+}
 /**
  * Utility to normalize ANY provider error into a clear message.
  */
@@ -26,14 +37,14 @@ function makeFriendlyError(provider: string, raw: string): string {
 /* -----------------------------------------------------------
    OPENAI WHISPER
 ----------------------------------------------------------- */
-export async function transcribeAudio(apiKey: string, blob: Blob): Promise<string> {
+export async function transcribeAudio(apiKey: string, blob: Blob, selectedLang: string): Promise<string> {
   try {
     if (!apiKey) throw new Error("Missing API key");
 
     const formData = new FormData();
     formData.append("file", blob, "audio.webm");
     formData.append("model", "whisper-1");
-
+    formData.append("language", mapLanguage(selectedLang)); // NEW V0.2.0
     console.log("🎬 Starting OpenAI transcription...");
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -62,7 +73,7 @@ export async function transcribeAudio(apiKey: string, blob: Blob): Promise<strin
 /* -----------------------------------------------------------
    DEEPGRAM
 ----------------------------------------------------------- */
-export async function transcribeWithDeepgram(apiKey: string, blob: Blob): Promise<string> {
+export async function transcribeWithDeepgram(apiKey: string, blob: Blob, selectedLang: string): Promise<string> {
   try {
     if (!apiKey) throw new Error("Missing API key");
 
@@ -71,7 +82,7 @@ export async function transcribeWithDeepgram(apiKey: string, blob: Blob): Promis
     const arrayBuffer = await blob.arrayBuffer();
 
     const response = await fetch(
-      "https://api.deepgram.com/v1/listen?model=nova-3",
+      `https://api.deepgram.com/v1/listen?model=nova-3&language=${mapLanguage(selectedLang)}`,
       {
         method: "POST",
         headers: {
@@ -105,7 +116,7 @@ export async function transcribeWithDeepgram(apiKey: string, blob: Blob): Promis
 /* -----------------------------------------------------------
    ASSEMBLYAI
 ----------------------------------------------------------- */
-export async function transcribeWithAssemblyAI(apiKey: string, blob: Blob): Promise<string> {
+export async function transcribeWithAssemblyAI(apiKey: string, blob: Blob, selectedLang: string): Promise<string> {
   try {
     if (!apiKey) throw new Error("Missing API key");
 
@@ -131,7 +142,7 @@ export async function transcribeWithAssemblyAI(apiKey: string, blob: Blob): Prom
     // Start job
     const body = {
       audio_url: audioUrl,
-      language_code: "en",
+      language_code: mapLanguage(selectedLang),
       auto_chapters: false,
     };
 

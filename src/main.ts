@@ -244,7 +244,7 @@ async saveRecording(blob: Blob) {
         if (!this.settings.deepgramApiKey)
           throw new Error("Missing Deepgram API key");
 
-        text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob);
+        text = await transcribeWithDeepgram(this.settings.deepgramApiKey, blob, this.settings.language);
       }
 
       // ---------------------------
@@ -254,7 +254,7 @@ async saveRecording(blob: Blob) {
         if (!this.settings.assemblyApiKey)
           throw new Error("Missing AssemblyAI API key");
 
-        text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob);
+        text = await transcribeWithAssemblyAI(this.settings.assemblyApiKey, blob, this.settings.language);
       }
 
       // ---------------------------
@@ -264,7 +264,7 @@ async saveRecording(blob: Blob) {
         if (!this.settings.openaiApiKey)
           throw new Error("Missing OpenAI API key");
 
-        text = await transcribeAudio(this.settings.openaiApiKey, blob);
+        text = await transcribeAudio(this.settings.openaiApiKey, blob, this.settings.language);
       }
 
       // Minimum spinner time (clean UX)
