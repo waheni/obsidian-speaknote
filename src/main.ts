@@ -267,6 +267,13 @@ async saveRecording(blob: Blob) {
   let filename = "";
   try {
     const folderPath = this.settings.defaultFolder || "SpeakNotes";
+    // 🛡 Validate folder name to avoid Obsidian crash
+    const invalidChars = /[\\/:*?"<>|]/;
+
+    if (invalidChars.test(folderPath)) {
+      new Notice("📁 Invalid folder name.\nRemove special characters like / \\ : * ? \" < > |");
+      return;
+    }
     await ensureFolder(this.app, folderPath);
 
     const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
@@ -430,6 +437,12 @@ async saveRecording(blob: Blob) {
 
   async playRecording(file: TFile) {
   try {
+    // 🛡 Safety: Check if file still exists
+    if (!this.app.vault.getAbstractFileByPath(file.path)) {
+      new Notice("⚠️ Recording no longer exists.");
+      return;
+    }
+    
     const data = await this.app.vault.readBinary(file);
     const blob = new Blob([data], { type: "audio/webm" });
     const url = URL.createObjectURL(blob);

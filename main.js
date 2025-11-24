@@ -462,6 +462,11 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
     let filename = "";
     try {
       const folderPath = this.settings.defaultFolder || "SpeakNotes";
+      const invalidChars = /[\\/:*?"<>|]/;
+      if (invalidChars.test(folderPath)) {
+        new import_obsidian2.Notice('\u{1F4C1} Invalid folder name.\nRemove special characters like / \\ : * ? " < > |');
+        return;
+      }
       await ensureFolder(this.app, folderPath);
       const timestamp = window.moment().format("YYYY-MM-DD_HH-mm-ss");
       filename = `${folderPath}/${timestamp}.webm`;
@@ -542,6 +547,10 @@ var SpeakNotePlugin = class extends import_obsidian2.Plugin {
   // end function
   async playRecording(file) {
     try {
+      if (!this.app.vault.getAbstractFileByPath(file.path)) {
+        new import_obsidian2.Notice("\u26A0\uFE0F Recording no longer exists.");
+        return;
+      }
       const data = await this.app.vault.readBinary(file);
       const blob = new Blob([data], { type: "audio/webm" });
       const url = URL.createObjectURL(blob);
