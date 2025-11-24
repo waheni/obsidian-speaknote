@@ -41,7 +41,7 @@ var DEFAULT_SETTINGS = {
   language: "en",
   defaultFolder: "SpeakNotes",
   autoTranscribe: true,
-  maxRecordingSecondsFree: 5,
+  maxRecordingSecondsFree: 60,
   // 1-minute limit
   extendedRecordingEnabled: false,
   // will enable 5-min recording

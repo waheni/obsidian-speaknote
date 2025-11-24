@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS: SpeakNoteSettings = {
 
   defaultFolder: "SpeakNotes",
   autoTranscribe: true,
-  maxRecordingSecondsFree: 5,        // 1-minute limit
+  maxRecordingSecondsFree: 60,        // 1-minute limit
   extendedRecordingEnabled: false,    // will enable 5-min recording
   premiumUnlocked: false              // will enable unlimited
 };
