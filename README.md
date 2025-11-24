@@ -218,7 +218,7 @@ Pull requests, feature suggestions, and bug reports are welcome!
 # 🧑‍💻 Author
 **Heni Wael (Neurahex)**  
 GitHub: https://github.com/waheni
-Email: mailto:waelheni@neurahex.com
+👉 Email: *waelheni@neurahex.com*
 ---
 
 Enjoy fast, clean, voice‑powered notes in Obsidian with **SpeakNote**! 🎙️  
