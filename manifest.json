@@ -1,9 +1,9 @@
 {
   "id": "speaknote",
   "name": "SpeakNote",
-  "version": "0.2.0",
+  "version": "v0.2.0",
   "minAppVersion": "1.5.0",
-  "description": "Record voice notes in Obsidian and auto-transcribe them to markdown using Deepgram, AssemblyAI, or OpenAI Whisper.",
+  "description": "Record voice notes and auto-transcribe them to markdown using Deepgram, AssemblyAI, or OpenAI Whisper.",
   "author": "Neurahex (Heni Wael)",
   "authorUrl": "https://github.com/waheni",
   "isDesktopOnly": false
