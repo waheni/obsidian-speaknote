@@ -1,5 +1,5 @@
 import { Plugin, Notice, TFile } from "obsidian";
-import { ensureFolder, saveBinary } from "./vaultUtils";
+import { ensureFolder } from "./vaultUtils";
 import { SpeakNoteSettingTab, DEFAULT_SETTINGS, SpeakNoteSettings } from "./settings";
 import { transcribeAudio , transcribeWithDeepgram , transcribeWithAssemblyAI} from "./transcribe";
 
@@ -28,7 +28,7 @@ async function safeCreateBinary(app: App, path: string, data: Uint8Array): Promi
     try {
       // @ts-ignore
       this?.handleError?.("Binary File Save", err);
-    } catch (_) {
+    } catch {
       new Notice("📁 Error saving audio file.\nA fallback file will be created.");
     }
 
@@ -80,7 +80,7 @@ async function safeCreateFile(app: App, path: string, content: string): Promise<
     try {
       // @ts-ignore
       this?.handleError?.("File Save", err);
-    } catch (_) {
+    } catch {
       new Notice("📁 File system error while saving.\nA fallback file will be created.");
     }
 

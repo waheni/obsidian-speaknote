@@ -283,7 +283,7 @@ async function safeCreateBinary(app, path, data) {
     }
     try {
       this?.handleError?.("Binary File Save", err);
-    } catch (_) {
+    } catch {
       new import_obsidian2.Notice("\u{1F4C1} Error saving audio file.\nA fallback file will be created.");
     }
     try {
@@ -315,7 +315,7 @@ async function safeCreateFile(app, path, content) {
     }
     try {
       this?.handleError?.("File Save", err);
-    } catch (_) {
+    } catch {
       new import_obsidian2.Notice("\u{1F4C1} File system error while saving.\nA fallback file will be created.");
     }
     try {
