@@ -52,6 +52,10 @@
   to { opacity: 0; transform: translateY(10px); }
 }
 
+.speaknote-fade-out {
+  animation: speaknote-fade-out 0.5s forwards;
+}
+
 .speaknote-ribbon.disabled {
   opacity: 0.5;
   pointer-events: none;

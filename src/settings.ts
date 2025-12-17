@@ -47,11 +47,13 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "SpeakNote Settings" });
+    new Setting(containerEl)
+      .setName("Speaknote settings")
+      .setHeading();
 
     // Provider selection
    new Setting(containerEl)
-   .setName("Transcription Provider")
+   .setName("Transcription provider")
    .setDesc("Choose which API to use for transcription")
    .addDropdown(drop => 
     drop
@@ -69,8 +71,8 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
     // Assembly AI API Key
     if (this.plugin.settings.provider === "AssemblyAI") {
         new Setting(containerEl)
-        .setName("AssemblyAI API Key")
-        .setDesc("Used for Assembly AI transcriptions")
+        .setName("AssemblyAI API key")
+        .setDesc("Used for AssemblyAI transcriptions")
         .addText(text =>
          text
             .setPlaceholder("e1_...")
@@ -83,7 +85,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
       }  // Deepgram API Key
      else if (this.plugin.settings.provider === "Deepgram") {
         new Setting(containerEl)
-        .setName("Deepgram API Key")
+        .setName("Deepgram API key")
         .setDesc("Used for Deepgram transcriptions")
         .addText(text =>
          text
@@ -98,7 +100,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
       else{
     // OpenAI API Key input
     new Setting(containerEl)
-      .setName("OpenAI API Key")
+      .setName("OpenAI API key")
       .setDesc("Used for cloud transcription requests")
       .addText((text) =>
         text
@@ -124,7 +126,7 @@ new Setting(containerEl)
     .addOption("es", "Spanish")
     .setValue(this.plugin.settings.language)
     .onChange(async (value: string) => {
-      this.plugin.settings.language = value as any;
+      this.plugin.settings.language = value as "en" | "fr" | "de" | "es";
       await this.plugin.saveSettings();
     })
   );
@@ -168,7 +170,9 @@ new Setting(containerEl)
 // -------------------------
 // Early Access (optional email)
 // -------------------------
-containerEl.createEl("h3", { text: "Extended Recording" });
+new Setting(containerEl)
+  .setName("Extended recording")
+  .setHeading();
 
 new Setting(containerEl)
   .setName("Coming soon")
@@ -179,7 +183,7 @@ new Setting(containerEl)
 // Feedback link
 // -----------------------------
 new Setting(containerEl)
-  .setName("Feedback & Support")
+  .setName("Feedback and support")
   .setDesc("Report bugs or request features on GitHub")
   .addButton(btn =>
     btn

@@ -1,3 +1,5 @@
+import { requestUrl } from "obsidian";
+
 export function mapLanguage(lang: string): string {
   // Whisper, Deepgram, and AssemblyAI mostly accept ISO codes:
   // en, fr, ar, es
@@ -77,29 +79,37 @@ export async function transcribeAudio(apiKey: string, blob: Blob, selectedLang: 
     const formData = new FormData();
     formData.append("file", blob, "audio.webm");
     formData.append("model", "whisper-1");
-    formData.append("language", mapLanguage(selectedLang)); // NEW V0.2.0
-    console.log("🎬 Starting OpenAI transcription...");
+    formData.append("language", mapLanguage(selectedLang));
 
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: formData,
-    });
+    let response;
+    try {
+      response = await requestUrl({
+        url: "https://api.openai.com/v1/audio/transcriptions",
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: formData as unknown as string,
+        throw: false
+      });
+    } catch (netErr: unknown) {
+      const msg = netErr instanceof Error ? netErr.message : String(netErr);
+      if (msg.includes("ERR_INTERNET_DISCONNECTED") || msg.includes("ERR_NETWORK")) {
+        throw new Error("Network connection issue");
+      }
+      throw netErr;
+    }
 
-    const raw = await response.text();
-
-    if (!response.ok) {
-      const friendly = makeFriendlyError("OpenAI", raw);
+    if (response.status !== 200) {
+      const friendly = makeFriendlyError("OpenAI", response.text);
       throw new Error(friendly);
     }
 
-    const data = JSON.parse(raw);
+    const data = response.json;
     if (!data.text) throw new Error("OpenAI returned empty text.");
 
     return data.text;
-  } catch (err: any) {
-    console.error("❌ OpenAI transcription failed:", err);
-    throw new Error(err.message || "OpenAI transcription error");
+  } catch (err: unknown) {
+    console.error("OpenAI transcription failed:", err);
+    throw new Error(err instanceof Error ? err.message : "OpenAI transcription error");
   }
 }
 
@@ -110,29 +120,33 @@ export async function transcribeWithDeepgram(apiKey: string, blob: Blob, selecte
   try {
     if (!apiKey) throw new Error("Missing API key");
 
-    console.log("🎬 Starting Deepgram transcription...");
-
     const arrayBuffer = await blob.arrayBuffer();
 
-    const response = await fetch(
-      `https://api.deepgram.com/v1/listen?model=nova-3&language=${mapLanguage(selectedLang)}`,
-      {
+    let response;
+    try {
+      response = await requestUrl({
+        url: `https://api.deepgram.com/v1/listen?model=nova-3&language=${mapLanguage(selectedLang)}`,
         method: "POST",
         headers: {
           Authorization: `Token ${apiKey}`,
         },
-        body: arrayBuffer,
+        body: arrayBuffer as unknown as string,
+        throw: false
+      });
+    } catch (netErr: unknown) {
+      const msg = netErr instanceof Error ? netErr.message : String(netErr);
+      if (msg.includes("ERR_INTERNET_DISCONNECTED") || msg.includes("ERR_NETWORK")) {
+        throw new Error("Network connection issue");
       }
-    );
+      throw netErr;
+    }
 
-    const raw = await response.text();
-
-    if (!response.ok) {
-      const friendly = makeFriendlyError("Deepgram", raw);
+    if (response.status !== 200) {
+      const friendly = makeFriendlyError("Deepgram", response.text);
       throw new Error(friendly);
     }
 
-    const data = JSON.parse(raw);
+    const data = response.json;
 
     const transcript =
       data?.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim();
@@ -140,9 +154,9 @@ export async function transcribeWithDeepgram(apiKey: string, blob: Blob, selecte
     if (!transcript) throw new Error("Deepgram returned empty transcript.");
 
     return transcript;
-  } catch (err: any) {
-    console.error("❌ Deepgram transcription failed:", err);
-    throw new Error(err.message || "Deepgram transcription error");
+  } catch (err: unknown) {
+    console.error("Deepgram transcription failed:", err);
+    throw new Error(err instanceof Error ? err.message : "Deepgram transcription error");
   }
 }
 
@@ -153,23 +167,30 @@ export async function transcribeWithAssemblyAI(apiKey: string, blob: Blob, selec
   try {
     if (!apiKey) throw new Error("Missing API key");
 
-    console.log("🎬 Starting AssemblyAI transcription...");
-
     // Upload
-    const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
-      method: "POST",
-      headers: { "Authorization": apiKey },
-      body: blob,
-    });
+    let uploadRes;
+    try {
+      uploadRes = await requestUrl({
+        url: "https://api.assemblyai.com/v2/upload",
+        method: "POST",
+        headers: { "Authorization": apiKey },
+        body: await blob.arrayBuffer() as unknown as string,
+        throw: false
+      });
+    } catch (netErr: unknown) {
+      const msg = netErr instanceof Error ? netErr.message : String(netErr);
+      if (msg.includes("ERR_INTERNET_DISCONNECTED") || msg.includes("ERR_NETWORK")) {
+        throw new Error("Network connection issue");
+      }
+      throw netErr;
+    }
 
-    const uploadRaw = await uploadRes.text();
-
-    if (!uploadRes.ok) {
-      const friendly = makeFriendlyError("AssemblyAI", uploadRaw);
+    if (uploadRes.status !== 200) {
+      const friendly = makeFriendlyError("AssemblyAI", uploadRes.text);
       throw new Error(friendly);
     }
 
-    const uploadData = JSON.parse(uploadRaw);
+    const uploadData = uploadRes.json;
     const audioUrl = uploadData.upload_url;
 
     // Start job
@@ -179,36 +200,55 @@ export async function transcribeWithAssemblyAI(apiKey: string, blob: Blob, selec
       auto_chapters: false,
     };
 
-    const jobRes = await fetch("https://api.assemblyai.com/v2/transcript", {
-      method: "POST",
-      headers: {
-        "Authorization": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    let jobRes;
+    try {
+      jobRes = await requestUrl({
+        url: "https://api.assemblyai.com/v2/transcript",
+        method: "POST",
+        headers: {
+          "Authorization": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        throw: false
+      });
+    } catch (netErr: unknown) {
+      const msg = netErr instanceof Error ? netErr.message : String(netErr);
+      if (msg.includes("ERR_INTERNET_DISCONNECTED") || msg.includes("ERR_NETWORK")) {
+        throw new Error("Network connection issue");
+      }
+      throw netErr;
+    }
 
-    const rawJob = await jobRes.text();
-
-    if (!jobRes.ok) {
-      const friendly = makeFriendlyError("AssemblyAI", rawJob);
+    if (jobRes.status !== 200) {
+      const friendly = makeFriendlyError("AssemblyAI", jobRes.text);
       throw new Error(friendly);
     }
 
-    const jobData = JSON.parse(rawJob);
+    const jobData = jobRes.json;
     const jobId = jobData.id;
 
     // Poll
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 2000));
 
-      const pollRes = await fetch(
-        `https://api.assemblyai.com/v2/transcript/${jobId}`,
-        { headers: { "Authorization": apiKey } }
-      );
+      let pollRes;
+      try {
+        pollRes = await requestUrl({
+          url: `https://api.assemblyai.com/v2/transcript/${jobId}`,
+          method: "GET",
+          headers: { "Authorization": apiKey },
+          throw: false
+        });
+      } catch (netErr: unknown) {
+        const msg = netErr instanceof Error ? netErr.message : String(netErr);
+        if (msg.includes("ERR_INTERNET_DISCONNECTED") || msg.includes("ERR_NETWORK")) {
+          throw new Error("Network connection issue");
+        }
+        throw netErr;
+      }
 
-      const pollText = await pollRes.text();
-      const pollData = JSON.parse(pollText);
+      const pollData = pollRes.json;
 
       if (pollData.status === "completed") return pollData.text;
       if (pollData.status === "error") {
@@ -218,8 +258,8 @@ export async function transcribeWithAssemblyAI(apiKey: string, blob: Blob, selec
     }
 
     throw new Error("AssemblyAI timeout: transcription took too long.");
-  } catch (err: any) {
-    console.error("❌ AssemblyAI transcription failed:", err);
-    throw new Error(err.message || "AssemblyAI transcription error");
+  } catch (err: unknown) {
+    console.error("AssemblyAI transcription failed:", err);
+    throw new Error(err instanceof Error ? err.message : "AssemblyAI transcription error");
   }
 }

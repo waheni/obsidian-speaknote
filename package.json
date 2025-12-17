@@ -1,18 +1,24 @@
 {
   "name": "obsidian-speaknote",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "description": "SpeakNote lets you **record and save voice notes** directly in your Obsidian vault.",
   "main": "main.js",
   "scripts": {
   "build": "esbuild src/main.ts --bundle --outdir=. --format=cjs --external:obsidian",
-  "watch": "esbuild src/main.ts --bundle --outdir=. --format=cjs --external:obsidian --watch"
+  "watch": "esbuild src/main.ts --bundle --outdir=. --format=cjs --external:obsidian --watch",
+  "lint": "eslint src --ext .ts",
+  "lint:fix": "eslint src --ext .ts --fix"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^24.9.2",
+    "@typescript-eslint/eslint-plugin": "^8.49.0",
+    "@typescript-eslint/parser": "^8.49.0",
     "esbuild": "^0.25.11",
+    "eslint": "^8.57.1",
+    "eslint-plugin-obsidianmd": "^0.1.9",
     "obsidian": "^1.10.2-1"
   }
 }

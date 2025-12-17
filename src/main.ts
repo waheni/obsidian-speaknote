@@ -12,11 +12,12 @@ import { transcribeAudio , transcribeWithDeepgram , transcribeWithAssemblyAI} fr
 async function safeCreateBinary(app: App, path: string, data: Uint8Array): Promise<TFile> {
   try {
     return await app.vault.createBinary(path, data);
-  } catch (err: any) {
-    console.error("❌ Binary file creation error:", err);
+  } catch (err: unknown) {
+    console.error("Binary file creation error:", err);
 
     // ----- File already exists -----
-    if (err?.message?.toLowerCase()?.includes("exists")) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (errorMessage.toLowerCase().includes("exists")) {
       const ext = path.split(".").pop();
       const base = path.replace(`.${ext}`, "");
       const fallback = `${base}_${Date.now()}.${ext}`;
@@ -29,7 +30,7 @@ async function safeCreateBinary(app: App, path: string, data: Uint8Array): Promi
       // @ts-ignore
       this?.handleError?.("Binary File Save", err);
     } catch {
-      new Notice("📁 Error saving audio file.\nA fallback file will be created.");
+      new Notice("Error saving audio file\nA fallback file will be created");
     }
 
     // ----- Attempt fallback with simple filename -----
@@ -58,11 +59,12 @@ async function safeCreateBinary(app: App, path: string, data: Uint8Array): Promi
 async function safeCreateFile(app: App, path: string, content: string): Promise<TFile> {
   try {
     return await app.vault.create(path, content);
-  } catch (err: any) {
-    console.error("❌ File creation error:", err);
+  } catch (err: unknown) {
+    console.error("File creation error:", err);
 
     // ----- File already exists -----
-    if (err?.message?.toLowerCase()?.includes("exists")) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (errorMessage.toLowerCase().includes("exists")) {
       const ext = path.split(".").pop();
       const base = path.replace(`.${ext}`, "");
       const fallback = `${base}_${Date.now()}.${ext}`;
@@ -81,7 +83,7 @@ async function safeCreateFile(app: App, path: string, content: string): Promise<
       // @ts-ignore
       this?.handleError?.("File Save", err);
     } catch {
-      new Notice("📁 File system error while saving.\nA fallback file will be created.");
+      new Notice("File system error while saving\nA fallback file will be created");
     }
 
     // 2. Try fallback filename
@@ -117,14 +119,13 @@ export default class SpeakNotePlugin extends Plugin {
   private isAutoStopped: boolean = false;
 
   async onload() {
-    console.log("✅ SpeakNote plugin loaded");
     
     await this.loadSettings();
     this.addSettingTab(new SpeakNoteSettingTab(this.app, this));
     // Ribbon icon (top-left)
     this.ribbonIconEl = this.addRibbonIcon(
       "mic",
-      "SpeakNote: Record / Stop",
+      "Speaknote: Record or stop",
       () => this.toggleRecording()
     );
     this.ribbonIconEl.addClass("speaknote-ribbon");
@@ -132,14 +133,14 @@ export default class SpeakNotePlugin extends Plugin {
     // Start / Stop command
     this.addCommand({
       id: "toggle-voice-recording",
-      name: "🎙️ Start / Stop Recording",
+      name: "Start or stop recording",
       callback: () => this.toggleRecording(),
     });
 
     // Play last saved recording
     this.addCommand({
       id: "play-last-recording",
-      name: "▶️ Play Last Recording",
+      name: "Play last recording",
       callback: async () => {
         if (this.lastSavedFile) {
           await this.playRecording(this.lastSavedFile);
@@ -158,7 +159,6 @@ export default class SpeakNotePlugin extends Plugin {
     await this.saveData(this.settings);
   }
   onunload() {
-    console.log("🧹 SpeakNote plugin unloaded");
   }
   async startRecording() {
     try {
@@ -179,7 +179,7 @@ export default class SpeakNotePlugin extends Plugin {
     this.isAutoStopped = false;                 
 
     this.ribbonIconEl?.classList.add("recording");
-    new Notice("🎤 Recording started...");
+    new Notice("Recording started");
     // ----------------------------------------------------
     // ⭐ NEW V.0.2.0 — Enforce free recording limit (1 minute)
     // ----------------------------------------------------
@@ -191,12 +191,11 @@ export default class SpeakNotePlugin extends Plugin {
     }
 
     this.recordingTimeout = window.setTimeout(() => {
-      console.log("⏳ SpeakNote limit reached, auto-stopping...");
       this.isAutoStopped = true;
       this.stopRecording();
     }, maxMs);
     // ----------------------------------------------------
-  } catch (err: any) {
+  } catch (err: unknown) {
         this.handleError("Microphone", err);
 
     }
@@ -204,7 +203,7 @@ export default class SpeakNotePlugin extends Plugin {
   async toggleRecording() {
   // 🧱 Prevent spamming clicks
   if (this.isBusy) {
-    new Notice("⏳ Please wait...");
+    new Notice("Please wait");
     return;
   }
   this.isBusy = true;
@@ -219,7 +218,7 @@ export default class SpeakNotePlugin extends Plugin {
     }
   } catch (err) {
     console.error("Toggle error:", err);
-    new Notice("❌ Failed to toggle recording.");
+    new Notice("Failed to toggle recording");
   } finally {
     // ✅ Unlock after short delay
     setTimeout(() => (this.isBusy = false), 500);
@@ -250,12 +249,11 @@ stopRecording() {
       if (this.isAutoStopped) {
         this.showUpgradeMessage();
       } else {
-        new Notice("💾 Recording stopped, saving file...");
+        new Notice("Recording stopped, saving file");
       }
-      console.log("🛑 Recording stopped and stream released");
     } catch (err) {
-      console.error("❌ Error while stopping recording:", err);
-      new Notice("❌ Could not stop recording cleanly");
+      console.error("Error while stopping recording:", err);
+      new Notice("Could not stop recording cleanly");
     }
   }
 }
@@ -271,7 +269,7 @@ async saveRecording(blob: Blob) {
     const invalidChars = /[\\/:*?"<>|]/;
 
     if (invalidChars.test(folderPath)) {
-      new Notice("📁 Invalid folder name.\nRemove special characters like / \\ : * ? \" < > |");
+      new Notice("Invalid folder name\nRemove special characters like / \\ : * ? \" < > |");
       return;
     }
     await ensureFolder(this.app, folderPath);
@@ -285,15 +283,14 @@ async saveRecording(blob: Blob) {
     const newFile = await safeCreateBinary(this.app, filename, buffer);
     this.lastSavedFile = newFile;
 
-    new Notice(`✅ Saved: ${newFile.path}`);
-    console.log("✅ Audio file saved:", newFile.path);
+    new Notice(`Saved: ${newFile.path}`);
 
     // ───────────────────────────────────────────────
     // 🔹 Auto-transcription (if enabled)
     // ───────────────────────────────────────────────
     if (this.settings.autoTranscribe) {
 
-      this.showOverlay("🧠 Transcribing your recording...");
+      this.showOverlay("Transcribing your recording");
       const start = Date.now();
       let text = "";
 
@@ -342,23 +339,23 @@ async saveRecording(blob: Blob) {
         const leaf = this.app.workspace.getLeaf(true);
         await leaf.openFile(transcriptFile);
 
-        new Notice(`📄 Transcript saved: ${transcriptFile.path}`);
+        new Notice(`Transcript saved: ${transcriptFile.path}`);
       } else {
-        new Notice("⚠️ Empty transcription result.");
+        new Notice("Empty transcription result");
       }
     }
 
-  } catch (apiError: any) {
+  } catch (apiError: unknown) {
   this.hideOverlay();
-  console.error("❌ API Error:", apiError);
+  console.error("API error:", apiError);
 
-  const msg = (apiError?.message || "").toLowerCase();
+  const msg = (apiError instanceof Error ? apiError.message : "").toLowerCase();
 
   // ----- Missing or invalid API key -----
   if (msg.includes("missing") || msg.includes("no api key")) {
     new Notice(
-      "🔑 Missing API key.\n" +
-      "Add your provider key in Settings → SpeakNote.",
+      "Missing API key\n" +
+      "Add your provider key in settings",
       7000
     );
   }
@@ -370,8 +367,8 @@ async saveRecording(blob: Blob) {
     msg.includes("401")
   ) {
     new Notice(
-      "❌ Invalid API key.\n" +
-      "Please double-check your key in Settings.",
+      "Invalid API key\n" +
+      "Please double-check your key in settings",
       7000
     );
   }
@@ -383,8 +380,8 @@ async saveRecording(blob: Blob) {
     msg.includes("insufficient_quota")
   ) {
     new Notice(
-      "⚠️ API quota exceeded.\n" +
-      "Your provider usage limit has been reached.",
+      "API quota exceeded\n" +
+      "Your provider usage limit has been reached",
       7000
     );
   }
@@ -392,8 +389,8 @@ async saveRecording(blob: Blob) {
   // ----- Language unsupported -----
   else if (msg.includes("language")) {
     new Notice(
-      "🌐 Language not supported by this provider.\n" +
-      "Try English, French, Spanish, or German.",
+      "Language not supported by this provider\n" +
+      "Try English, French, Spanish, or German",
       7000
     );
   }
@@ -406,8 +403,8 @@ async saveRecording(blob: Blob) {
     msg.includes("connection")
   ) {
     new Notice(
-      "🌐 Network issue.\n" +
-      "Please check your internet connection and try again.",
+      "Network issue\n" +
+      "Please check your internet connection and try again",
       7000
     );
   }
@@ -419,8 +416,8 @@ async saveRecording(blob: Blob) {
     msg.includes("null")
   ) {
     new Notice(
-      "⚠️ Transcription returned no text.\n" +
-      "Try again or use a different provider.",
+      "Transcription returned no text\n" +
+      "Try again or use a different provider",
       7000
     );
   }
@@ -439,7 +436,7 @@ async saveRecording(blob: Blob) {
   try {
     // 🛡 Safety: Check if file still exists
     if (!this.app.vault.getAbstractFileByPath(file.path)) {
-      new Notice("⚠️ Recording no longer exists.");
+      new Notice("Recording no longer exists");
       return;
     }
     
@@ -447,19 +444,9 @@ async saveRecording(blob: Blob) {
     const blob = new Blob([data], { type: "audio/webm" });
     const url = URL.createObjectURL(blob);
 
-    console.log("🎧 Calling showFloatingPlayer with", url);
-    const el = this.showFloatingPlayer(url);
-    console.log("🎧 showFloatingPlayer returned:", el);
+    this.showFloatingPlayer(url);
 
-    // Double-check after next tick
-    setTimeout(() => {
-      console.log(
-        "🔎 After 0ms, exists?",
-        !!document.querySelector(".speaknote-player")
-      );
-    }, 0);
-
-    new Notice(`▶️ Playing ${file.name}`);
+    new Notice(`Playing ${file.name}`);
   } catch (err) {
     this.handleError("Playback", err);
 
@@ -468,8 +455,6 @@ async saveRecording(blob: Blob) {
  
 
 showFloatingPlayer(url: string) {
-  console.log("📢 showFloatingPlayer CALLED:", url);
-
   // Remove any previous player
   document.querySelector(".speaknote-player")?.remove();
 
@@ -496,16 +481,13 @@ showFloatingPlayer(url: string) {
   }
 
   target.appendChild(container);
-  console.log("✅ Player appended to:", target);
 
-  // 🕐 Auto-close timer (5 seconds after playback ends)
+  // Auto-close timer (5 seconds after playback ends)
   audio.addEventListener("ended", () => {
-    console.log("🕐 Playback ended, will close in 5s...");
     setTimeout(() => {
     if (container.isConnected) {
-      container.style.animation = "speaknote-fade-out 0.5s forwards";
+      container.addClass("speaknote-fade-out");
       setTimeout(() => container.remove(), 500);
-      console.log("🧹 Player faded out and removed");
     }
     }, 5000);
     });
@@ -537,70 +519,70 @@ hideOverlay() {
 private showUpgradeMessage() {
   const el = document.createElement("div");
   el.className = "speaknote-upgrade-toast";
-  el.textContent = "⏳ Free limit reached — unlock 5-minute recordings in Early Access";
+  el.textContent = "Free limit reached—unlock 5-minute recordings in early access";
 
   document.body.appendChild(el);
 
   setTimeout(() => {
-    el.style.opacity = "0";
+    el.addClass("speaknote-fade-out");
     setTimeout(() => el.remove(), 500);
   }, 8000); // stays 8s
 }
 
 
-private handleError(source: string, err: any) {
-  console.error(`❌ ${source} Error:`, err);
+private handleError(source: string, err: unknown) {
+  console.error(`${source} error:`, err);
 
-  const msg = (err?.message || err?.toString() || "").toLowerCase();
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
 
   // ---- API KEY ISSUES ----
   if (msg.includes("missing api key") || msg.includes("no api key")) {
-    new Notice("🔑 Missing API key.\nAdd it in Settings → SpeakNote.");
+    new Notice("Missing API key\nAdd it in settings");
     return;
   }
 
   if (msg.includes("invalid api key") || msg.includes("unauthorized") || msg.includes("401")) {
-    new Notice("❌ Invalid API key.\nPlease verify it in Settings.");
+    new Notice("Invalid API key\nPlease verify it in settings");
     return;
   }
 
   // ---- QUOTA / PLAN ----
   if (msg.includes("quota") || msg.includes("limit") || msg.includes("insufficient")) {
-    new Notice("⚠️ API quota exceeded.\nTry again later or upgrade your provider plan.");
+    new Notice("API quota exceeded\nTry again later or upgrade your provider plan");
     return;
   }
 
   // ---- NETWORK ----
   if (msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout")) {
-    new Notice("🌐 Network issue.\nCheck your internet connection.");
+    new Notice("Network issue\nCheck your internet connection");
     return;
   }
 
   // ---- LANGUAGE ----
   if (msg.includes("language") || msg.includes("unsupported")) {
-    new Notice("🌐 Language not supported by this provider.");
+    new Notice("Language not supported by this provider");
     return;
   }
 
   // ---- FILE ERRORS ----
   if (msg.includes("exists") || msg.includes("file already exists")) {
-    new Notice("📄 File already exists.\nA new version was created.");
+    new Notice("File already exists\nA new version was created");
     return;
   }
 
   if (msg.includes("filesystem") || msg.includes("permission")) {
-    new Notice("📁 File system error.\nCheck folder permissions.");
+    new Notice("File system error\nCheck folder permissions");
     return;
   }
 
   // ---- MICROPHONE ----
   if (msg.includes("microphone") || msg.includes("mic")) {
-    new Notice("🎤 Microphone error.\nCheck permissions or try a different device.");
+    new Notice("Microphone error\nCheck permissions or try a different device");
     return;
   }
 
   // ---- FALLBACK ----
-  new Notice("⚠️ Unexpected error.\nSee console for details (Ctrl+Shift+I).");
+  new Notice("Unexpected error\nSee console for details (Ctrl+Shift+I)");
 }
 
 }
