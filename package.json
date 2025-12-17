@@ -1,6 +1,6 @@
 {
   "name": "obsidian-speaknote",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "SpeakNote lets you **record and save voice notes** directly in your Obsidian vault.",
   "main": "main.js",
   "scripts": {

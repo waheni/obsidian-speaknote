@@ -47,10 +47,6 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl)
-      .setName("General")
-      .setHeading();
-
     // Provider selection
    new Setting(containerEl)
    .setName("Transcription provider")
@@ -71,8 +67,8 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
     // Assembly AI API Key
     if (this.plugin.settings.provider === "AssemblyAI") {
         new Setting(containerEl)
-        .setName("AssemblyAI API key")
-        .setDesc("Used for AssemblyAI transcriptions")
+        .setName("API key")
+        .setDesc("Used for transcriptions")
         .addText(text =>
          text
             .setPlaceholder("e1_...")
@@ -85,8 +81,8 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
       }  // Deepgram API Key
      else if (this.plugin.settings.provider === "Deepgram") {
         new Setting(containerEl)
-        .setName("Deepgram API key")
-        .setDesc("Used for Deepgram transcriptions")
+        .setName("API key")
+        .setDesc("Used for transcriptions")
         .addText(text =>
          text
             .setPlaceholder("dg_...")
@@ -100,11 +96,11 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
       else{
     // OpenAI API Key input
     new Setting(containerEl)
-      .setName("OpenAI API key")
-      .setDesc("Used for cloud transcription requests")
+      .setName("API key")
+      .setDesc("Used for transcription requests")
       .addText((text) =>
         text
-          .setPlaceholder("sk-…")
+          .setPlaceholder("sk-...")
           .setValue(this.plugin.settings.openaiApiKey)
           .onChange(async (value) => {
             this.plugin.settings.openaiApiKey = value.trim();
@@ -118,7 +114,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
 // -------------------------
 new Setting(containerEl)
   .setName("Language")
-  .setDesc("Language used for transcription.")
+  .setDesc("Language used for transcription")
   .addDropdown(drop => drop
     .addOption("en", "English")
     .addOption("fr", "French")
@@ -161,7 +157,7 @@ new Setting(containerEl)
 // -------------------------
 new Setting(containerEl)
   .setName("Free recording limit")
-  .setDesc("The free version limits recordings to 1 minute.")
+  .setDesc("The free version limits recordings to 1 minute")
   .addText(text => {
     text.setValue(this.plugin.settings.maxRecordingSecondsFree.toString());
     text.setDisabled(true);
@@ -176,7 +172,7 @@ new Setting(containerEl)
 
 new Setting(containerEl)
   .setName("Coming soon")
-  .setDesc("Extended 5-minute recording will be available in v0.3.0. Sign-in required.")
+  .setDesc("Extended 5-minute recording will be available in v0.3.0 (sign-in required)")
   .addText(txt => txt.setValue("Available in next version").setDisabled(true));
   
 // -----------------------------

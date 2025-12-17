@@ -56,7 +56,6 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("General").setHeading();
     new import_obsidian.Setting(containerEl).setName("Transcription provider").setDesc("Choose which API to use for transcription").addDropdown(
       (drop) => drop.addOption("AssemblyAI", "AssemblyAI").addOption("OpenAI", "OpenAI").addOption("Deepgram", "Deepgram").setValue(this.plugin.settings.provider).onChange(async (value) => {
         this.plugin.settings.provider = value;
@@ -65,28 +64,28 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
       })
     );
     if (this.plugin.settings.provider === "AssemblyAI") {
-      new import_obsidian.Setting(containerEl).setName("AssemblyAI API key").setDesc("Used for AssemblyAI transcriptions").addText(
+      new import_obsidian.Setting(containerEl).setName("API key").setDesc("Used for transcriptions").addText(
         (text) => text.setPlaceholder("e1_...").setValue(this.plugin.settings.assemblyApiKey).onChange(async (value) => {
           this.plugin.settings.assemblyApiKey = value.trim();
           await this.plugin.saveSettings();
         })
       );
     } else if (this.plugin.settings.provider === "Deepgram") {
-      new import_obsidian.Setting(containerEl).setName("Deepgram API key").setDesc("Used for Deepgram transcriptions").addText(
+      new import_obsidian.Setting(containerEl).setName("API key").setDesc("Used for transcriptions").addText(
         (text) => text.setPlaceholder("dg_...").setValue(this.plugin.settings.deepgramApiKey).onChange(async (value) => {
           this.plugin.settings.deepgramApiKey = value.trim();
           await this.plugin.saveSettings();
         })
       );
     } else {
-      new import_obsidian.Setting(containerEl).setName("OpenAI API key").setDesc("Used for cloud transcription requests").addText(
-        (text) => text.setPlaceholder("sk-\u2026").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+      new import_obsidian.Setting(containerEl).setName("API key").setDesc("Used for transcription requests").addText(
+        (text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
           this.plugin.settings.openaiApiKey = value.trim();
           await this.plugin.saveSettings();
         })
       );
     }
-    new import_obsidian.Setting(containerEl).setName("Language").setDesc("Language used for transcription.").addDropdown(
+    new import_obsidian.Setting(containerEl).setName("Language").setDesc("Language used for transcription").addDropdown(
       (drop) => drop.addOption("en", "English").addOption("fr", "French").addOption("ar", "Arabic").addOption("es", "Spanish").setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.settings.language = value;
         await this.plugin.saveSettings();
@@ -104,12 +103,12 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Free recording limit").setDesc("The free version limits recordings to 1 minute.").addText((text) => {
+    new import_obsidian.Setting(containerEl).setName("Free recording limit").setDesc("The free version limits recordings to 1 minute").addText((text) => {
       text.setValue(this.plugin.settings.maxRecordingSecondsFree.toString());
       text.setDisabled(true);
     });
     new import_obsidian.Setting(containerEl).setName("Extended recording").setHeading();
-    new import_obsidian.Setting(containerEl).setName("Coming soon").setDesc("Extended 5-minute recording will be available in v0.3.0. Sign-in required.").addText((txt) => txt.setValue("Available in next version").setDisabled(true));
+    new import_obsidian.Setting(containerEl).setName("Coming soon").setDesc("Extended 5-minute recording will be available in v0.3.0 (sign-in required)").addText((txt) => txt.setValue("Available in next version").setDisabled(true));
     new import_obsidian.Setting(containerEl).setName("Feedback and support").setDesc("Report bugs or request features on GitHub").addButton(
       (btn) => btn.setButtonText("Open feedback page").setCta().onClick(() => {
         window.open("https://github.com/waheni/obsidian-speaknote/issues", "_blank");
@@ -330,7 +329,7 @@ async function safeCreateBinary(app, path, data) {
     try {
       this?.handleError?.("Binary File Save", err);
     } catch {
-      new import_obsidian3.Notice("Error saving audio file\nA fallback file will be created");
+      new import_obsidian3.Notice("Error saving audio file (a fallback file will be created)");
     }
     try {
       const fallback = `SpeakNote_${Date.now()}.webm`;
@@ -341,8 +340,8 @@ async function safeCreateBinary(app, path, data) {
       try {
         return await app.vault.createBinary(finalName, data);
       } catch (finalErr) {
-        console.error("\u274C Final recovery for binary failed:", finalErr);
-        new import_obsidian3.Notice("\u274C Critical error saving audio file.\nCheck vault permissions.");
+        console.error("Final recovery for binary failed:", finalErr);
+        new import_obsidian3.Notice("Critical error saving audio file\u2014check vault permissions");
         throw finalErr;
       }
     }
@@ -363,7 +362,7 @@ async function safeCreateFile(app, path, content) {
     try {
       this?.handleError?.("File Save", err);
     } catch {
-      new import_obsidian3.Notice("File system error while saving\nA fallback file will be created");
+      new import_obsidian3.Notice("File system error while saving (a fallback file will be created)");
     }
     try {
       const fallback = `SpeakNote_${Date.now()}.md`;
@@ -374,8 +373,8 @@ async function safeCreateFile(app, path, content) {
       try {
         return await app.vault.create(finalName, content);
       } catch (finalErr) {
-        console.error("\u274C Final recovery also failed:", finalErr);
-        new import_obsidian3.Notice("\u274C Critical file save error.\nCheck vault permissions.");
+        console.error("Final recovery also failed:", finalErr);
+        new import_obsidian3.Notice("Critical file save error\u2014check vault permissions");
         throw finalErr;
       }
     }
@@ -507,7 +506,7 @@ var SpeakNotePlugin = class extends import_obsidian3.Plugin {
       const folderPath = this.settings.defaultFolder || "SpeakNotes";
       const invalidChars = /[\\/:*?"<>|]/;
       if (invalidChars.test(folderPath)) {
-        new import_obsidian3.Notice('Invalid folder name\nRemove special characters like / \\ : * ? " < > |');
+        new import_obsidian3.Notice('Invalid folder name (remove special characters like / \\ : * ? " < > |)');
         return;
       }
       await ensureFolder(this.app, folderPath);
@@ -553,32 +552,32 @@ var SpeakNotePlugin = class extends import_obsidian3.Plugin {
       const msg = (apiError instanceof Error ? apiError.message : "").toLowerCase();
       if (msg.includes("missing") || msg.includes("no api key")) {
         new import_obsidian3.Notice(
-          "Missing API key\nAdd your provider key in settings",
+          "Missing API key\u2014add your provider key in settings",
           7e3
         );
       } else if (msg.includes("invalid") || msg.includes("unauthorized") || msg.includes("incorrect api key") || msg.includes("401")) {
         new import_obsidian3.Notice(
-          "Invalid API key\nPlease double-check your key in settings",
+          "Invalid API key\u2014please double-check your key in settings",
           7e3
         );
       } else if (msg.includes("quota") || msg.includes("limit") || msg.includes("insufficient_quota")) {
         new import_obsidian3.Notice(
-          "API quota exceeded\nYour provider usage limit has been reached",
+          "API quota exceeded\u2014your provider usage limit has been reached",
           7e3
         );
       } else if (msg.includes("language")) {
         new import_obsidian3.Notice(
-          "Language not supported by this provider\nTry English, French, Spanish, or German",
+          "Language not supported by this provider (try English, French, Spanish, or German)",
           7e3
         );
       } else if (msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout") || msg.includes("connection")) {
         new import_obsidian3.Notice(
-          "Network issue\nPlease check your internet connection and try again",
+          "Network issue\u2014please check your internet connection and try again",
           7e3
         );
       } else if (msg.includes("empty") || msg.includes("no text") || msg.includes("null")) {
         new import_obsidian3.Notice(
-          "Transcription returned no text\nTry again or use a different provider",
+          "Transcription returned no text\u2014try again or use a different provider",
           7e3
         );
       } else {
@@ -656,19 +655,19 @@ var SpeakNotePlugin = class extends import_obsidian3.Plugin {
     console.error(`${source} error:`, err);
     const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
     if (msg.includes("missing api key") || msg.includes("no api key")) {
-      new import_obsidian3.Notice("Missing API key\nAdd it in settings");
+      new import_obsidian3.Notice("Missing API key\u2014add it in settings");
       return;
     }
     if (msg.includes("invalid api key") || msg.includes("unauthorized") || msg.includes("401")) {
-      new import_obsidian3.Notice("Invalid API key\nPlease verify it in settings");
+      new import_obsidian3.Notice("Invalid API key\u2014please verify it in settings");
       return;
     }
     if (msg.includes("quota") || msg.includes("limit") || msg.includes("insufficient")) {
-      new import_obsidian3.Notice("API quota exceeded\nTry again later or upgrade your provider plan");
+      new import_obsidian3.Notice("API quota exceeded\u2014try again later or upgrade your provider plan");
       return;
     }
     if (msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout")) {
-      new import_obsidian3.Notice("Network issue\nCheck your internet connection");
+      new import_obsidian3.Notice("Network issue\u2014check your internet connection");
       return;
     }
     if (msg.includes("language") || msg.includes("unsupported")) {
@@ -676,17 +675,17 @@ var SpeakNotePlugin = class extends import_obsidian3.Plugin {
       return;
     }
     if (msg.includes("exists") || msg.includes("file already exists")) {
-      new import_obsidian3.Notice("File already exists\nA new version was created");
+      new import_obsidian3.Notice("File already exists (a new version was created)");
       return;
     }
     if (msg.includes("filesystem") || msg.includes("permission")) {
-      new import_obsidian3.Notice("File system error\nCheck folder permissions");
+      new import_obsidian3.Notice("File system error\u2014check folder permissions");
       return;
     }
     if (msg.includes("microphone") || msg.includes("mic")) {
-      new import_obsidian3.Notice("Microphone error\nCheck permissions or try a different device");
+      new import_obsidian3.Notice("Microphone error\u2014check permissions or try a different device");
       return;
     }
-    new import_obsidian3.Notice("Unexpected error\nSee console for details (Ctrl+Shift+I)");
+    new import_obsidian3.Notice("Unexpected error\u2014see console for details (Ctrl+Shift+I)");
   }
 };

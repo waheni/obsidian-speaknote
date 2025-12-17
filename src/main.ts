@@ -30,7 +30,7 @@ async function safeCreateBinary(app: App, path: string, data: Uint8Array): Promi
       // @ts-ignore
       this?.handleError?.("Binary File Save", err);
     } catch {
-      new Notice("Error saving audio file\nA fallback file will be created");
+      new Notice("Error saving audio file (a fallback file will be created)");
     }
 
     // ----- Attempt fallback with simple filename -----
@@ -45,8 +45,8 @@ async function safeCreateBinary(app: App, path: string, data: Uint8Array): Promi
       try {
         return await app.vault.createBinary(finalName, data);
       } catch (finalErr) {
-        console.error("❌ Final recovery for binary failed:", finalErr);
-        new Notice("❌ Critical error saving audio file.\nCheck vault permissions.");
+        console.error("Final recovery for binary failed:", finalErr);
+        new Notice("Critical error saving audio file—check vault permissions");
         throw finalErr; // last resort: stop everything
       }
     }
@@ -83,7 +83,7 @@ async function safeCreateFile(app: App, path: string, content: string): Promise<
       // @ts-ignore
       this?.handleError?.("File Save", err);
     } catch {
-      new Notice("File system error while saving\nA fallback file will be created");
+      new Notice("File system error while saving (a fallback file will be created)");
     }
 
     // 2. Try fallback filename
@@ -98,8 +98,8 @@ async function safeCreateFile(app: App, path: string, content: string): Promise<
       try {
         return await app.vault.create(finalName, content);
       } catch (finalErr) {
-        console.error("❌ Final recovery also failed:", finalErr);
-        new Notice("❌ Critical file save error.\nCheck vault permissions.");
+        console.error("Final recovery also failed:", finalErr);
+        new Notice("Critical file save error—check vault permissions");
         throw finalErr; // last resort
       }
     }
@@ -269,7 +269,7 @@ async saveRecording(blob: Blob) {
     const invalidChars = /[\\/:*?"<>|]/;
 
     if (invalidChars.test(folderPath)) {
-      new Notice("Invalid folder name\nRemove special characters like / \\ : * ? \" < > |");
+      new Notice("Invalid folder name (remove special characters like / \\ : * ? \" < > |)");
       return;
     }
     await ensureFolder(this.app, folderPath);
@@ -354,8 +354,7 @@ async saveRecording(blob: Blob) {
   // ----- Missing or invalid API key -----
   if (msg.includes("missing") || msg.includes("no api key")) {
     new Notice(
-      "Missing API key\n" +
-      "Add your provider key in settings",
+      "Missing API key—add your provider key in settings",
       7000
     );
   }
@@ -367,8 +366,7 @@ async saveRecording(blob: Blob) {
     msg.includes("401")
   ) {
     new Notice(
-      "Invalid API key\n" +
-      "Please double-check your key in settings",
+      "Invalid API key—please double-check your key in settings",
       7000
     );
   }
@@ -380,8 +378,7 @@ async saveRecording(blob: Blob) {
     msg.includes("insufficient_quota")
   ) {
     new Notice(
-      "API quota exceeded\n" +
-      "Your provider usage limit has been reached",
+      "API quota exceeded—your provider usage limit has been reached",
       7000
     );
   }
@@ -389,8 +386,7 @@ async saveRecording(blob: Blob) {
   // ----- Language unsupported -----
   else if (msg.includes("language")) {
     new Notice(
-      "Language not supported by this provider\n" +
-      "Try English, French, Spanish, or German",
+      "Language not supported by this provider (try English, French, Spanish, or German)",
       7000
     );
   }
@@ -403,8 +399,7 @@ async saveRecording(blob: Blob) {
     msg.includes("connection")
   ) {
     new Notice(
-      "Network issue\n" +
-      "Please check your internet connection and try again",
+      "Network issue—please check your internet connection and try again",
       7000
     );
   }
@@ -416,8 +411,7 @@ async saveRecording(blob: Blob) {
     msg.includes("null")
   ) {
     new Notice(
-      "Transcription returned no text\n" +
-      "Try again or use a different provider",
+      "Transcription returned no text—try again or use a different provider",
       7000
     );
   }
@@ -537,24 +531,24 @@ private handleError(source: string, err: unknown) {
 
   // ---- API KEY ISSUES ----
   if (msg.includes("missing api key") || msg.includes("no api key")) {
-    new Notice("Missing API key\nAdd it in settings");
+    new Notice("Missing API key—add it in settings");
     return;
   }
 
   if (msg.includes("invalid api key") || msg.includes("unauthorized") || msg.includes("401")) {
-    new Notice("Invalid API key\nPlease verify it in settings");
+    new Notice("Invalid API key—please verify it in settings");
     return;
   }
 
   // ---- QUOTA / PLAN ----
   if (msg.includes("quota") || msg.includes("limit") || msg.includes("insufficient")) {
-    new Notice("API quota exceeded\nTry again later or upgrade your provider plan");
+    new Notice("API quota exceeded—try again later or upgrade your provider plan");
     return;
   }
 
   // ---- NETWORK ----
   if (msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout")) {
-    new Notice("Network issue\nCheck your internet connection");
+    new Notice("Network issue—check your internet connection");
     return;
   }
 
@@ -566,23 +560,23 @@ private handleError(source: string, err: unknown) {
 
   // ---- FILE ERRORS ----
   if (msg.includes("exists") || msg.includes("file already exists")) {
-    new Notice("File already exists\nA new version was created");
+    new Notice("File already exists (a new version was created)");
     return;
   }
 
   if (msg.includes("filesystem") || msg.includes("permission")) {
-    new Notice("File system error\nCheck folder permissions");
+    new Notice("File system error—check folder permissions");
     return;
   }
 
   // ---- MICROPHONE ----
   if (msg.includes("microphone") || msg.includes("mic")) {
-    new Notice("Microphone error\nCheck permissions or try a different device");
+    new Notice("Microphone error—check permissions or try a different device");
     return;
   }
 
   // ---- FALLBACK ----
-  new Notice("Unexpected error\nSee console for details (Ctrl+Shift+I)");
+  new Notice("Unexpected error—see console for details (Ctrl+Shift+I)");
 }
 
 }
