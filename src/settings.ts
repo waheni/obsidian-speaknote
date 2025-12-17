@@ -48,7 +48,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName("Speaknote settings")
+      .setName("General")
       .setHeading();
 
     // Provider selection
@@ -58,8 +58,8 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
    .addDropdown(drop => 
     drop
       .addOption("AssemblyAI", "AssemblyAI")
-      .addOption("OpenAI", "OpenAI Whisper")
-      .addOption("Deepgram", "Deepgram Nova")
+      .addOption("OpenAI", "OpenAI")
+      .addOption("Deepgram", "Deepgram")
       .setValue(this.plugin.settings.provider)
       .onChange(async (value) => {
         this.plugin.settings.provider = value as Provider;
@@ -187,7 +187,7 @@ new Setting(containerEl)
   .setDesc("Report bugs or request features on GitHub")
   .addButton(btn =>
     btn
-      .setButtonText("Open Feedback Page")
+      .setButtonText("Open feedback page")
       .setCta()
       .onClick(() => {
         window.open("https://github.com/waheni/obsidian-speaknote/issues", "_blank");

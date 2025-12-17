@@ -125,7 +125,7 @@ export default class SpeakNotePlugin extends Plugin {
     // Ribbon icon (top-left)
     this.ribbonIconEl = this.addRibbonIcon(
       "mic",
-      "Speaknote: Record or stop",
+      "Record or stop",
       () => this.toggleRecording()
     );
     this.ribbonIconEl.addClass("speaknote-ribbon");

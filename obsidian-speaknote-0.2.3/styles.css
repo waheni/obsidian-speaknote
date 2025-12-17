@@ -1,0 +1,126 @@
+/* SpeakNote ribbon icon styling */
+.speaknote-ribbon {
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+/* When recording is active */
+.speaknote-ribbon.recording {
+  color: #e74c3c !important; /* force red */
+  transform: scale(1.15);
+  animation: speaknote-pulse 1.2s infinite;
+}
+
+@keyframes speaknote-pulse {
+  0%, 100% { transform: scale(1.0); }
+  50% { transform: scale(1.15); }
+}
+
+
+
+/* Floating audio player - clear and visible */
+.speaknote-player {
+  position: fixed !important;
+  bottom: 2.5rem !important;       /* Move it higher above the edge */
+  right: 2rem !important;          /* Shift left a bit */
+  z-index: 2147483647 !important;  /* Stay on top of everything */
+  background: var(--background-primary-alt, #222) !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 250px;
+  animation: speaknote-slide-up 0.3s ease-out;
+  opacity: 0.98;
+}
+
+/* Make the audio element fill neatly */
+.speaknote-player audio {
+  width: 100%;
+}
+
+/* Entrance animation */
+@keyframes speaknote-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Fade-out animation for auto-close */
+@keyframes speaknote-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(10px); }
+}
+
+.speaknote-fade-out {
+  animation: speaknote-fade-out 0.5s forwards;
+}
+
+.speaknote-ribbon.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* SpeakNote overlay spinner */
+.speaknote-overlay {
+  position: fixed;
+  inset: 0;
+  
+  /* Darken background without blur */
+  background: rgba(0, 0, 0, 0.50);
+  
+  /* Remove blur (this caused text to look fuzzy) */
+  backdrop-filter: none !important;
+  
+  z-index: 2147483647 !important;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  color: #fff;
+  font-size: 1.15em;
+  font-weight: 600;
+  text-align: center;
+
+  /* Higher readability */
+  text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.speaknote-spinner {
+  width: 42px;
+  height: 42px;
+  border: 5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 14px;
+}
+
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.speaknote-upgrade-toast {
+  position: fixed;
+  top: 20px; 
+  left: 50%;
+  transform: translateX(-50%);
+
+  background: #ff7043;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+
+  z-index: 99999;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+
+  animation: fadein 0.3s ease-out;
+}

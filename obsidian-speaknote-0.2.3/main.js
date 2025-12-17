@@ -56,9 +56,9 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("General").setHeading();
+    new import_obsidian.Setting(containerEl).setName("Speaknote settings").setHeading();
     new import_obsidian.Setting(containerEl).setName("Transcription provider").setDesc("Choose which API to use for transcription").addDropdown(
-      (drop) => drop.addOption("AssemblyAI", "AssemblyAI").addOption("OpenAI", "OpenAI").addOption("Deepgram", "Deepgram").setValue(this.plugin.settings.provider).onChange(async (value) => {
+      (drop) => drop.addOption("AssemblyAI", "AssemblyAI").addOption("OpenAI", "OpenAI Whisper").addOption("Deepgram", "Deepgram Nova").setValue(this.plugin.settings.provider).onChange(async (value) => {
         this.plugin.settings.provider = value;
         await this.plugin.saveSettings();
         this.display();
@@ -111,7 +111,7 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Extended recording").setHeading();
     new import_obsidian.Setting(containerEl).setName("Coming soon").setDesc("Extended 5-minute recording will be available in v0.3.0. Sign-in required.").addText((txt) => txt.setValue("Available in next version").setDisabled(true));
     new import_obsidian.Setting(containerEl).setName("Feedback and support").setDesc("Report bugs or request features on GitHub").addButton(
-      (btn) => btn.setButtonText("Open feedback page").setCta().onClick(() => {
+      (btn) => btn.setButtonText("Open Feedback Page").setCta().onClick(() => {
         window.open("https://github.com/waheni/obsidian-speaknote/issues", "_blank");
       })
     );
@@ -399,7 +399,7 @@ var SpeakNotePlugin = class extends import_obsidian3.Plugin {
     this.addSettingTab(new SpeakNoteSettingTab(this.app, this));
     this.ribbonIconEl = this.addRibbonIcon(
       "mic",
-      "Record or stop",
+      "Speaknote: Record or stop",
       () => this.toggleRecording()
     );
     this.ribbonIconEl.addClass("speaknote-ribbon");
