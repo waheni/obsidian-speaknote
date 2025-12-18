@@ -386,7 +386,7 @@ async saveRecording(blob: Blob) {
   // ----- Language unsupported -----
   else if (msg.includes("language")) {
     new Notice(
-      "Language not supported by this provider try English, French, Spanish, or German",
+      "Language not supported by this provider. Try English, French, Spanish, or German.",
       7000
     );
   }

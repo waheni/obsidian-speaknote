@@ -71,7 +71,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
         .setDesc("Used for transcriptions")
         .addText(text =>
          text
-            .setPlaceholder("e1_...")
+            .setPlaceholder("e1_… (API key)")
             .setValue(this.plugin.settings.assemblyApiKey)
             .onChange(async (value) => {
               this.plugin.settings.assemblyApiKey = value.trim();
@@ -85,7 +85,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
         .setDesc("Used for transcriptions")
         .addText(text =>
          text
-            .setPlaceholder("dg_...")
+            .setPlaceholder("dg_… (API key)")
             .setValue(this.plugin.settings.deepgramApiKey)
             .onChange(async (value) => {
               this.plugin.settings.deepgramApiKey = value.trim();
@@ -100,7 +100,7 @@ export class SpeakNoteSettingTab extends PluginSettingTab {
       .setDesc("Used for transcription requests")
       .addText((text) =>
         text
-          .setPlaceholder("sk-...")
+          .setPlaceholder("sk-… (API key)")
           .setValue(this.plugin.settings.openaiApiKey)
           .onChange(async (value) => {
             this.plugin.settings.openaiApiKey = value.trim();

@@ -1,7 +1,7 @@
 {
   "id": "speaknote",
   "name": "SpeakNote",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "minAppVersion": "1.5.0",
   "description": "Record voice notes and auto-transcribe them to markdown using Deepgram, AssemblyAI, or OpenAI Whisper.",
   "author": "Neurahex (Heni Wael)",

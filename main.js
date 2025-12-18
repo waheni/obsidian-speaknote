@@ -65,21 +65,21 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
     );
     if (this.plugin.settings.provider === "AssemblyAI") {
       new import_obsidian.Setting(containerEl).setName("API key").setDesc("Used for transcriptions").addText(
-        (text) => text.setPlaceholder("e1_...").setValue(this.plugin.settings.assemblyApiKey).onChange(async (value) => {
+        (text) => text.setPlaceholder("e1_\u2026 (API key)").setValue(this.plugin.settings.assemblyApiKey).onChange(async (value) => {
           this.plugin.settings.assemblyApiKey = value.trim();
           await this.plugin.saveSettings();
         })
       );
     } else if (this.plugin.settings.provider === "Deepgram") {
       new import_obsidian.Setting(containerEl).setName("API key").setDesc("Used for transcriptions").addText(
-        (text) => text.setPlaceholder("dg_...").setValue(this.plugin.settings.deepgramApiKey).onChange(async (value) => {
+        (text) => text.setPlaceholder("dg_\u2026 (API key)").setValue(this.plugin.settings.deepgramApiKey).onChange(async (value) => {
           this.plugin.settings.deepgramApiKey = value.trim();
           await this.plugin.saveSettings();
         })
       );
     } else {
       new import_obsidian.Setting(containerEl).setName("API key").setDesc("Used for transcription requests").addText(
-        (text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+        (text) => text.setPlaceholder("sk-\u2026 (API key)").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
           this.plugin.settings.openaiApiKey = value.trim();
           await this.plugin.saveSettings();
         })
@@ -567,7 +567,7 @@ var SpeakNotePlugin = class extends import_obsidian3.Plugin {
         );
       } else if (msg.includes("language")) {
         new import_obsidian3.Notice(
-          "Language not supported by this provider try English, French, Spanish, or German",
+          "Language not supported by this provider. Try English, French, Spanish, or German.",
           7e3
         );
       } else if (msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout") || msg.includes("connection")) {
