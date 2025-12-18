@@ -118,7 +118,7 @@ new Setting(containerEl)
   .addDropdown(drop => drop
     .addOption("en", "English")
     .addOption("fr", "French")
-    .addOption("ar", "Arabic")
+    .addOption("de", "German")
     .addOption("es", "Spanish")
     .setValue(this.plugin.settings.language)
     .onChange(async (value: string) => {

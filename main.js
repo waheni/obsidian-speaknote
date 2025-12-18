@@ -86,7 +86,7 @@ var SpeakNoteSettingTab = class extends import_obsidian.PluginSettingTab {
       );
     }
     new import_obsidian.Setting(containerEl).setName("Language").setDesc("Language used for transcription").addDropdown(
-      (drop) => drop.addOption("en", "English").addOption("fr", "French").addOption("ar", "Arabic").addOption("es", "Spanish").setValue(this.plugin.settings.language).onChange(async (value) => {
+      (drop) => drop.addOption("en", "English").addOption("fr", "French").addOption("de", "German").addOption("es", "Spanish").setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.settings.language = value;
         await this.plugin.saveSettings();
       })
@@ -567,7 +567,7 @@ var SpeakNotePlugin = class extends import_obsidian3.Plugin {
         );
       } else if (msg.includes("language")) {
         new import_obsidian3.Notice(
-          "Language not supported by this provider (try English, French, Spanish, or German)",
+          "Language not supported by this provider try English, French, Spanish, or German",
           7e3
         );
       } else if (msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout") || msg.includes("connection")) {
